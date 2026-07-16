@@ -122,7 +122,7 @@ class ReadingsTab:
         row_wc.pack(fill="x", pady=2)
         ttk.Label(row_wc, text="Подмена воды:", width=16, anchor="w",
                   background=COLOR_CARD).pack(side="left")
-        self.read_wc_spin = SpinEntry(row_wc, width=6, step=1, default="")
+        self.read_wc_spin = SpinEntry(row_wc, width=6, step=5, default="")
         self.read_wc_spin.pack(side="left")
         self.read_wc_spin.entry.bind("<KeyRelease>", lambda e: self._update_read_wc_pct())
         self.read_wc_l_var = self.read_wc_spin.var
