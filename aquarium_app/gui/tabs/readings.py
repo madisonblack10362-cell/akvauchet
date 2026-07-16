@@ -122,11 +122,10 @@ class ReadingsTab:
         row_wc.pack(fill="x", pady=2)
         ttk.Label(row_wc, text="Подмена воды:", width=16, anchor="w",
                   background=COLOR_CARD).pack(side="left")
-        self.read_wc_l_var = tk.StringVar()
-        wc_entry = ttk.Entry(row_wc, textvariable=self.read_wc_l_var, width=8,
-                             justify="center")
-        wc_entry.pack(side="left")
-        wc_entry.bind("<KeyRelease>", lambda e: self._update_read_wc_pct())
+        self.read_wc_spin = SpinEntry(row_wc, width=6, step=1, default="")
+        self.read_wc_spin.pack(side="left")
+        self.read_wc_spin.entry.bind("<KeyRelease>", lambda e: self._update_read_wc_pct())
+        self.read_wc_l_var = self.read_wc_spin.var
         ttk.Label(row_wc, text="л", background=COLOR_CARD, foreground=COLOR_TEXT_MUTED).pack(
             side="left", padx=(4, 10))
         self.read_wc_pct_label = tk.Label(row_wc, text="= —%", bg=COLOR_CARD,
@@ -336,7 +335,7 @@ class ReadingsTab:
         # сбрасываем форму
         for key in MEASURED_PARAM_KEYS:
             self.read_spin_entries[key].set("")
-        self.read_wc_l_var.set("")
+        self.read_wc_spin.set("")
         self.read_wc_pct_label.config(text="= —%")
         self.read_comment_var.set("")
 
