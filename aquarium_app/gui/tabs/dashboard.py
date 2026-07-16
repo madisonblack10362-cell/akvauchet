@@ -194,6 +194,16 @@ class DashboardTab:
 
         # --- индикатор подмены воды (за неделю) ---
         wc_stats = get_water_change_stats(self.conn, aq_id, days=7)
+        aq = get_aquarium(self.conn, aq_id)
+        vol = aq["volume_l"] if aq else 0
+
+        # пересчитываем проценты если их нет в базе (старые записи)
+        if vol and wc_stats["count"] > 0:
+            if wc_stats["last_pct"] is None and wc_stats["last_l"] is not None:
+                wc_stats["last_pct"] = round(wc_stats["last_l"] / vol * 100, 1)
+            if wc_stats["total_pct"] == 0 and wc_stats["total_l"] > 0:
+                wc_stats["total_pct"] = round(wc_stats["total_l"] / vol * 100, 1)
+
         wc_frame = tk.Frame(card, bg=COLOR_ACCENT_SOFT, highlightbackground=COLOR_ACCENT,
                             highlightthickness=1)
         wc_frame.pack(fill="x", pady=(8, 0))
@@ -209,11 +219,9 @@ class DashboardTab:
             wc_body = tk.Frame(wc_frame, bg=COLOR_ACCENT_SOFT)
             wc_body.pack(fill="x", padx=10, pady=(0, 4))
 
-            # последняя подмена — главное число
+            # последняя подмена — главное число (всегда в %)
             if wc_stats["last_pct"] is not None:
                 last_txt = f"Последняя: {wc_stats['last_pct']:.1f}%"
-            elif wc_stats["last_l"] is not None:
-                last_txt = f"Последняя: {wc_stats['last_l']:g} л"
             else:
                 last_txt = ""
             tk.Label(wc_body, text=last_txt,
