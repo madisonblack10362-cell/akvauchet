@@ -271,12 +271,16 @@ class FertilizersTab:
         FF = self.FF
         P = DETAIL_PAD
 
+        # только элементы с ненулевым значением
+        active = [(ek, fert.get(ek, 0) or 0) for ek in keys if (fert.get(ek, 0) or 0) > 0]
+        if not active:
+            return
+
         ttk.Separator(parent).pack(fill="x", padx=P, pady=10)
         tk.Label(parent, text=title, font=(FF, 10, "bold"),
                  bg=COLOR_CARD, fg=COLOR_ACCENT).pack(anchor="w", padx=P, pady=(0, SECTION_GAP))
 
-        for ek in keys:
-            val = fert.get(ek, 0) or 0
+        for ek, val in active:
             color = ELEMENT_COLORS.get(ek, COLOR_ACCENT)
             ru = ELEMENT_RU.get(ek, ek)
             formula = ELEMENT_FORMULA.get(ek, ek)
@@ -292,19 +296,16 @@ class FertilizersTab:
             tk.Label(row, text=f"{ru} ({formula})", bg=COLOR_CARD, fg=COLOR_TEXT,
                      font=(FF, 10), width=18, anchor="w").pack(side="left")
             # значение
-            val_text = f"{val:.2f} мг/мл" if val > 0 else "—"
-            val_color = COLOR_TEXT if val > 0 else "#3a3d48"
-            tk.Label(row, text=val_text, bg=COLOR_CARD, fg=val_color,
-                     font=(FF, 10, "bold" if val > 0 else "normal"),
+            tk.Label(row, text=f"{val:.2f} мг/мл", bg=COLOR_CARD, fg=COLOR_TEXT,
+                     font=(FF, 10, "bold"),
                      width=14, anchor="w").pack(side="left")
             # бар
-            if val > 0:
-                bar_bg = tk.Frame(row, bg="#2a2015", height=10, width=160)
-                bar_bg.pack(side="left", padx=(12, 0))
-                bar_bg.pack_propagate(False)
-                max_in_group = max((fert.get(k, 0) or 0) for k in keys) or 1.0
-                bar_w = max(4, int(160 * (val / max_in_group)))
-                tk.Frame(bar_bg, bg=color, height=10, width=bar_w).place(x=0, y=0, relheight=1.0)
+            bar_bg = tk.Frame(row, bg="#2a2015", height=10, width=160)
+            bar_bg.pack(side="left", padx=(12, 0))
+            bar_bg.pack_propagate(False)
+            max_in_group = max(v for _, v in active) or 1.0
+            bar_w = max(4, int(160 * (val / max_in_group)))
+            tk.Frame(bar_bg, bg=color, height=10, width=bar_w).place(x=0, y=0, relheight=1.0)
 
     # ------------------------------------------------------------------
     # Обновление выпадающего списка на вкладке дозирования
