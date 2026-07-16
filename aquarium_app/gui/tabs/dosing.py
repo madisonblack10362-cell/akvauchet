@@ -806,8 +806,8 @@ class DosingTab:
         filter_key = self._dosing_trend_filter
 
         param_defs = [
-            ("no3", ELEMENT_COLORS["no3"], "NO3"),
             ("po4", ELEMENT_COLORS["po4"], "PO4"),
+            ("no3", ELEMENT_COLORS["no3"], "NO3"),
             ("k", ELEMENT_COLORS["k"], "K"),
             ("fe", ELEMENT_COLORS["fe"], "Fe"),
         ]

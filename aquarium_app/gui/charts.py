@@ -322,6 +322,8 @@ def draw_param_trend_chart(
     canvas._hover_h = h
     canvas._hover_w = w
     canvas._hover_type = "trend"
+    # все метки чтобы показывать 0 для отсутствующих в конкретный день
+    canvas._hover_all_labels = [(color, label) for _key, color, label, _hist in strips]
     canvas.bind("<Motion>", lambda e, c=canvas: on_chart_hover(c, e))
     canvas.bind("<Leave>", lambda e, c=canvas: on_chart_leave(c))
 
@@ -595,7 +597,7 @@ def _on_bars_hover(canvas, event):
 
 def on_chart_hover(canvas, event):
     """Показывает подсказку (дата + значения ВСЕХ параметров) для колонки точек
-    рядом с курсором.
+    рядом с курсором. Для отсутствующих в этот день параметров показывает 0.
     """
     if not canvas.winfo_exists():
         return
@@ -606,7 +608,7 @@ def on_chart_hover(canvas, event):
     nearest = min(points, key=lambda p: abs(p["x"] - event.x))
     if abs(nearest["x"] - event.x) > 25:
         return
-    # все точки на той же дате (сопоставляем по дате, а не по пикселям)
+    # все точки на той же дате
     same_x = [p for p in points if p["date"] == nearest["date"]]
     x = nearest["x"]
     h = getattr(canvas, "_hover_h", 80)
@@ -614,17 +616,27 @@ def on_chart_hover(canvas, event):
     ff = _get_chart_font(canvas)
     # направляющая вертикальная линия
     canvas.create_line(x, 0, x, h, fill="#3a3f4d", dash=(2, 2), tags="hover")
-    # подсвеченные точки
+    # подсвеченные точки (только те что реально есть)
     for p in same_x:
         canvas.create_oval(p["x"] - 4, p["y"] - 4, p["x"] + 4, p["y"] + 4,
                             outline="#ffffff", width=1.5, fill=p["color"], tags="hover")
-    # текст подсказки: дата + по строке на каждый параметр, в рамке
+    # собираем tooltip: все метки, подставляем 0 для отсутствующих
+    all_labels = getattr(canvas, "_hover_all_labels", [])
+    present = {p["label"] for p in same_x}
+    tip_lines = []
+    for color, label in all_labels:
+        if label in present:
+            p = next(pp for pp in same_x if pp["label"] == label)
+            tip_lines.append((label, f'{p["label"]}: {p["value"]:.2f}', color))
+        else:
+            tip_lines.append((label, f"{label}: 0.00", color))
+    # текст подсказки
     raw_date = nearest["date"]
     if isinstance(raw_date, dt.date):
         date_str = raw_date.strftime("%d.%m.%Y")
     else:
         date_str = from_iso(raw_date)
-    lines = [f'{p["label"]}: {p["value"]:.2f}' for p in same_x]
+    lines = [t for _, t, _ in tip_lines]
     line_h = 13
     box_h = line_h * (len(lines) + 1) + 6
     text_w = max(7 * len(t) for t in [date_str] + lines) + 14
@@ -638,10 +650,10 @@ def on_chart_hover(canvas, event):
                              fill="#05060a", outline=COLOR_BORDER, tags="hover")
     canvas.create_text(tx + 7, ty + 7, anchor="w", text=date_str,
                         fill=COLOR_TEXT_MUTED, font=(ff, 7), tags="hover")
-    for i, p in enumerate(same_x):
+    for i, (_lbl, text, color) in enumerate(tip_lines):
         canvas.create_text(tx + 7, ty + 7 + line_h * (i + 1), anchor="w",
-                            text=f'{p["label"]}: {p["value"]:.2f}',
-                            fill=p["color"], font=(ff, 8, "bold"), tags="hover")
+                            text=text,
+                            fill=color, font=(ff, 8, "bold"), tags="hover")
 
 
 def on_chart_leave(canvas):
