@@ -63,6 +63,16 @@ def _get_chart_font(canvas):
     return getattr(canvas, "_chart_font_family", FONT_FAMILY)
 
 
+def _lighten(hex_color, factor=0.25):
+    """Осветляет hex-цвет на factor (0-1), возвращая новый hex."""
+    hex_color = hex_color.lstrip("#")
+    r, g, b = int(hex_color[:2], 16), int(hex_color[2:4], 16), int(hex_color[4:], 16)
+    r = min(255, int(r + (255 - r) * factor))
+    g = min(255, int(g + (255 - g) * factor))
+    b = min(255, int(b + (255 - b) * factor))
+    return f"#{r:02x}{g:02x}{b:02x}"
+
+
 # ---------------------------------------------------------------------------
 # draw_element_bars — горизонтальная диаграмма прироста на дашборде
 # ---------------------------------------------------------------------------
@@ -164,7 +174,6 @@ def draw_param_trend_chart(
         Текст, показываемый при недостатке данных.
     target_ranges : dict | None
         Словарь {key: (min, max)} с целевыми диапазонами.
-        Если передан, на график рисуется полупрозрачная полоса целевого диапазона.
     """
     if not canvas.winfo_exists():
         return
@@ -235,9 +244,7 @@ def draw_param_trend_chart(
         strip_top = pad_t + idx * (strip_h + gap)
         strip_bottom = strip_top + strip_h
 
-        vals = [v for _, v in hist if isinstance(v, (int, float))]
-        if not vals:
-            continue
+        vals = [v for _, v in hist]
         local_max = max(vals) * 1.1
         local_min = min(0, min(vals))
         if local_max == local_min:
@@ -311,28 +318,8 @@ def draw_param_trend_chart(
 
 
 # ---------------------------------------------------------------------------
-# draw_daily_bars_chart — единый график с общей шкалой
+# draw_daily_bars_chart — группированные столбики по дням, единый масштаб
 # ---------------------------------------------------------------------------
-
-def _lighten(hex_color, factor=0.25):
-    """Осветляет hex-цвет на factor (0–1), возвращая новый hex."""
-    hex_color = hex_color.lstrip("#")
-    r, g, b = int(hex_color[:2], 16), int(hex_color[2:4], 16), int(hex_color[4:], 16)
-    r = min(255, int(r + (255 - r) * factor))
-    g = min(255, int(g + (255 - g) * factor))
-    b = min(255, int(b + (255 - b) * factor))
-    return f"#{r:02x}{g:02x}{b:02x}"
-
-
-def _darken(hex_color, factor=0.3):
-    """Затемняет hex-цвет."""
-    hex_color = hex_color.lstrip("#")
-    r, g, b = int(hex_color[:2], 16), int(hex_color[2:4], 16), int(hex_color[4:], 16)
-    r = max(0, int(r * (1 - factor)))
-    g = max(0, int(g * (1 - factor)))
-    b = max(0, int(b * (1 - factor)))
-    return f"#{r:02x}{g:02x}{b:02x}"
-
 
 def draw_daily_bars_chart(
     canvas, conn, aq_id,
@@ -342,13 +329,25 @@ def draw_daily_bars_chart(
     font_family="Segoe UI",
     empty_message="недостаточно данных для графика",
 ):
-    """Единый столбчатый график с общей шкалой Y.
+    """Столбчатый график суточных доз с ЕДИНЫМ масштабом.
 
-    Все элементы рисуются на ОДНОЙ полосе с ОБЩИМ масштабом —
+    Все элементы рисуются на ОДНОЙ области с общей шкалой Y —
     высота столбика прямо отражает реальное количество внесённого
-    элемента в мг/л. Микроэлементы (Fe) будут маленькими — это
-    правильно, потому что их и вносилось мало. У каждой даты —
-    группировка столбиков по элементам, рядом друг с другом.
+    элемента. У каждой даты — группировка столбиков по элементам.
+
+    Parameters
+    ----------
+    canvas : tk.Canvas
+    conn : sqlite3.Connection
+    aq_id : int
+    param_defs : list[tuple[str, str, str]]
+        Список (ключ, цвет, подпись).
+    days : int | None
+    since_iso : str | None
+    history_fn : callable | None
+        Функция (key) -> [(date_iso, value), ...].
+    font_family : str
+    empty_message : str
     """
     if not canvas.winfo_exists():
         return
@@ -359,7 +358,7 @@ def draw_daily_bars_chart(
         from aquarium_app.db import get_parameter_history
         history_fn = lambda key: get_parameter_history(conn, aq_id, key, days=days, since_iso=since_iso)
 
-    # Собираем данные по всем элементам
+    # ---- собираем данные по всем элементам ----
     elem_data = []  # [(key, color, label, [(date, val), ...])]
     for key, color, label in param_defs:
         hist = history_fn(key)
@@ -378,7 +377,7 @@ def draw_daily_bars_chart(
 
     n_elem = len(elem_data)
 
-    # ---- единый максимум по ВСЕМ элементам ----
+    # ---- единый максимум по ВСЕМ элементам (правильные пропорции) ----
     all_vals = []
     for _k, _c, _l, hist in elem_data:
         for _d, v in hist:
@@ -411,9 +410,9 @@ def draw_daily_bars_chart(
     span_days = max((period_end - period_start).days, 1)
 
     # ---- размеры canvas ----
-    chart_h = 200
-    legend_h = 22
-    pad_l, pad_r, pad_t, pad_b = 42, 10, 8, 22
+    chart_h = 220
+    legend_h = 24
+    pad_l, pad_r, pad_t, pad_b = 44, 12, 10, 24
     h = pad_t + chart_h + legend_h + pad_b
     canvas.config(height=h)
 
@@ -430,29 +429,29 @@ def draw_daily_bars_chart(
     chart_top = pad_t
     chart_bottom = pad_t + chart_h
 
-    # сетка
+    # ---- сетка ----
     for frac in [0.0, 0.25, 0.5, 0.75, 1.0]:
         y = chart_bottom - chart_h * frac
         val = global_max * frac
+        is_edge = frac in (0.0, 1.0)
         canvas.create_line(pad_l, y, pad_l + plot_w, y,
-                            fill="#1e2028" if frac not in (0.0, 1.0) else "#2c2f3a",
+                            fill="#2c2f3a" if is_edge else "#1a1c24",
                             width=1)
         canvas.create_text(pad_l - 5, y, anchor="e",
                            text=fmt_axis(val),
-                           fill="#3a3d48" if frac not in (0.0, 1.0) else COLOR_TEXT_MUTED,
+                           fill=COLOR_TEXT_MUTED if is_edge else "#3a3d48",
                            font=(font_family, 7))
 
     # ---- рисуем столбики ----
-    # ширина одной «группы» (все элементы одного дня вместе)
-    group_w = max(8, min(50, plot_w / max(span_days, 1) * 0.7))
-    bar_w = max(2, (group_w - (n_elem - 1)) / n_elem)
-    min_bar_h = 2
+    group_w = max(10, min(60, plot_w / max(len(all_dates_sorted), 1) * 0.75))
+    bar_w = max(3, (group_w - (n_elem - 1) * 1) / n_elem)
+    min_bar_h = 3
 
     hover_points = []
 
     for date_iso in all_dates_sorted:
         d = dt.date.fromisoformat(date_iso)
-        gx = x_for_date(d)  # центр группы
+        gx = x_for_date(d)
 
         # собираем значения для этой даты по всем элементам
         day_vals = {}
@@ -465,7 +464,6 @@ def draw_daily_bars_chart(
         if not day_vals:
             continue
 
-        # общая ширина группы
         total_bar_w = n_elem * bar_w + (n_elem - 1) * 1
         group_left = gx - total_bar_w / 2
 
@@ -482,32 +480,32 @@ def draw_daily_bars_chart(
             # тень
             canvas.create_rectangle(bx + 1, bar_top + 1,
                                     bx + bar_w + 1, chart_bottom + 1,
-                                    fill="#0a0b0e", outline="")
+                                    fill="#08090c", outline="")
             # основной столбик
             canvas.create_rectangle(bx, bar_top, bx + bar_w, chart_bottom,
                                     fill=color, outline="")
-            # верхняя шапка
-            cap_h = min(2, bar_h)
+            # верхняя шапка (3D эффект)
+            cap_h = min(3, bar_h)
             if cap_h >= 1:
                 canvas.create_rectangle(bx, bar_top, bx + bar_w, bar_top + cap_h,
                                         fill=_lighten(color, 0.35), outline="")
 
-            # подпись значения — только если столбик достаточно высокий
-            if bar_h > 14:
-                canvas.create_text(bx + bar_w / 2, bar_top + 3, anchor="n",
-                                   text=fmt_axis(v), fill="#ffffff",
+            # подпись значения
+            val_str = fmt_axis(v)
+            if bar_h > 16:
+                canvas.create_text(bx + bar_w / 2, bar_top + 4, anchor="n",
+                                   text=val_str, fill="#ffffff",
                                    font=(font_family, 6, "bold"))
-            # если столбик низкий — подпись сверху
             else:
-                canvas.create_text(bx + bar_w / 2, bar_top - 2, anchor="s",
-                                   text=fmt_axis(v), fill=_lighten(color, 0.3),
+                canvas.create_text(bx + bar_w / 2, bar_top - 3, anchor="s",
+                                   text=val_str, fill=_lighten(color, 0.3),
                                    font=(font_family, 6, "bold"))
 
             hover_points.append({"x": bx + bar_w / 2, "y": bar_top,
                                   "date": date_iso, "value": v,
                                   "label": label, "color": color})
 
-    # ---- ось X ----
+    # ---- ось X (даты) ----
     axis_y = chart_bottom + 3
     canvas.create_text(pad_l, axis_y, anchor="nw",
                        text=period_start.strftime("%d.%m"),
@@ -536,10 +534,10 @@ def draw_daily_bars_chart(
         canvas.create_rectangle(lx, legend_y - 5, lx + 8, legend_y + 3,
                                 fill=color, outline="")
         canvas.create_text(lx + 12, legend_y - 1, anchor="w",
-                           text=f"{label}  ∑ {fmt_axis(total)}",
+                           text=f"{label}  {fmt_axis(total)}",
                            fill=COLOR_TEXT_SOFT,
                            font=(font_family, 8))
-        lx += 10 + len(f"{label}  ∑ {fmt_axis(total)}") * 5 + 20
+        lx += 12 + len(f"{label}  {fmt_axis(total)}") * 5 + 16
 
     # ---- hover ----
     canvas._hover_points = hover_points
@@ -557,9 +555,7 @@ def draw_daily_bars_chart(
 
 def on_chart_hover(canvas, event):
     """Показывает подсказку (дата + значения ВСЕХ параметров) для колонки точек
-    рядом с курсором. Раньше бралась только одна ближайшая точка, и из-за этого
-    при совпадении дат всегда «выигрывал» NO3 (он первый в списке параметров),
-    а PO4/K из подсказки пропадали.
+    рядом с курсором.
     """
     if not canvas.winfo_exists():
         return
@@ -568,7 +564,7 @@ def on_chart_hover(canvas, event):
     if not points:
         return
     nearest = min(points, key=lambda p: abs(p["x"] - event.x))
-    if abs(nearest["x"] - event.x) > 20:
+    if abs(nearest["x"] - event.x) > 25:
         return
     # все точки на той же дате (сопоставляем по дате, а не по пикселям)
     same_x = [p for p in points if p["date"] == nearest["date"]]
@@ -578,7 +574,7 @@ def on_chart_hover(canvas, event):
     ff = _get_chart_font(canvas)
     # направляющая вертикальная линия
     canvas.create_line(x, 0, x, h, fill="#3a3f4d", dash=(2, 2), tags="hover")
-    # подсвеченная точка на каждой линии в этой колонке
+    # подсвеченные точки
     for p in same_x:
         canvas.create_oval(p["x"] - 4, p["y"] - 4, p["x"] + 4, p["y"] + 4,
                             outline="#ffffff", width=1.5, fill=p["color"], tags="hover")
@@ -613,10 +609,22 @@ def on_chart_leave(canvas):
 # ---------------------------------------------------------------------------
 # schedule_chart_draw — отложенная отрисовка с перерисовкой при ресайзе
 # ---------------------------------------------------------------------------
+# БАГ: раньше каждый вызов добавлял НОВЫЙ <Configure> обработчик без
+# удаления старого. При переключении «Нарастающий» → «По дням» старый
+# обработчик продолжал перезаписывать новый график. Фикс: генерационный
+# счётчик — устаревшие обработчики просто игнорируются.
+
+_schedule_gen = 0  # модульный счётчик поколения
+
 
 def schedule_chart_draw(canvas, draw_fn, *args, **kwargs):
     """Планирует отрисовку диаграммы после того, как canvas получит реальную ширину.
     Также перерисовывает при изменении размера окна.
+
+    Каждый вызов увеличивает поколение (gen). Отложенные и resize-обработчики
+    проверяют, что их gen совпадает с текущим — если нет, пропускают.
+    Это предотвращает накопление старых обработчиков, которые перезаписывали
+    новый график.
 
     Parameters
     ----------
@@ -627,17 +635,23 @@ def schedule_chart_draw(canvas, draw_fn, *args, **kwargs):
     *args, **kwargs
         Передаются в draw_fn после canvas.
     """
-    # отрисовка через 50мс (когда layout уже посчитан)
+    global _schedule_gen
+    _schedule_gen += 1
+    my_gen = _schedule_gen
+
     def deferred_draw():
-        if canvas.winfo_exists():
+        if canvas.winfo_exists() and _schedule_gen == my_gen:
             draw_fn(canvas, *args, **kwargs)
+
     canvas.after(50, deferred_draw)
-    # перерисовка при изменении размера canvas
+
     def on_resize(event):
-        # canvas мог быть уничтожен к моменту события
         if not canvas.winfo_exists():
             return
+        if _schedule_gen != my_gen:
+            return  # устаревший обработчик — пропускаем
         if not hasattr(canvas, "_last_w") or canvas._last_w != event.width:
             canvas._last_w = event.width
             draw_fn(canvas, *args, **kwargs)
+
     canvas.bind("<Configure>", on_resize)
