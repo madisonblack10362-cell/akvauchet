@@ -22,6 +22,19 @@ from aquarium_app.logic.formatters import parse_float
 MACRO_KEYS = ["no3", "po4", "k", "mg", "ca"]
 MICRO_KEYS = ["fe", "mn", "b", "zn", "cu", "mo", "co"]
 
+# ---------------------------------------------------------------------------
+# Единые константы отступов для всей вкладки
+# ---------------------------------------------------------------------------
+PAD_X = 16          # горизонтальный отступ от края вкладки
+PAD_Y_TOP = 14      # отступ сверху до заголовка
+GAP_BODY = 10       # промежуток между верхней панелью и телом
+GAP_PANELS = 10     # промежуток между левой и правой панелями
+CARD_PAD = 10       # внутренний отступ карточки
+CARD_GAP = 6        # вертикальный промежуток между карточками
+DETAIL_PAD = 16     # внутренний отступ панели деталей
+SECTION_GAP = 4     # отступ после заголовка секции
+ROW_GAP = 3         # вертикальный промежуток между строками в секции
+
 
 class FertilizersTab:
     """Миксин-вкладка «Удобрения» — карточный интерфейс с визуальным составом."""
@@ -36,7 +49,7 @@ class FertilizersTab:
 
         # --- верхняя панель: заголовок + поиск + кнопка ---
         top = tk.Frame(tab, bg=COLOR_BG)
-        top.pack(fill="x", padx=16, pady=(12, 0))
+        top.pack(fill="x", padx=PAD_X, pady=(PAD_Y_TOP, 0))
 
         tk.Label(top, text="Удобрения", font=(FF, 16, "bold"),
                  bg=COLOR_BG, fg=COLOR_TEXT).pack(side="left")
@@ -66,11 +79,11 @@ class FertilizersTab:
 
         # --- двухпанельная компоновка ---
         body = tk.Frame(tab, bg=COLOR_BG)
-        body.pack(fill="both", expand=True, padx=12, pady=(10, 12))
+        body.pack(fill="both", expand=True, padx=PAD_X, pady=(GAP_BODY, PAD_X))
 
         # левая панель — список карточек
         left = tk.Frame(body, bg=COLOR_BG, width=380)
-        left.pack(side="left", fill="y", padx=(0, 6))
+        left.pack(side="left", fill="y")
         left.pack_propagate(False)
 
         # прокручиваемая область карточек (скроллбар скрытый, только колесо)
@@ -81,17 +94,23 @@ class FertilizersTab:
             lambda e: self._fert_cards_canvas.configure(
                 scrollregion=self._fert_cards_canvas.bbox("all")),
         )
-        self._fert_cards_canvas.create_window((0, 0), window=self._fert_cards_inner, anchor="nw")
+        self._fert_cards_canvas.create_window((0, 0), window=self._fert_cards_inner, anchor="nw",
+                                               tags="inner_win")
         self._fert_cards_canvas.pack(side="left", fill="both", expand=True)
         self._fert_cards_canvas.bind("<Enter>",
             lambda e: self._fert_cards_canvas.bind_all("<MouseWheel>", self._fert_cards_wheel))
         self._fert_cards_canvas.bind("<Leave>",
             lambda e: self._fert_cards_canvas.unbind_all("<MouseWheel>"))
 
+        # растянуть внутренний фрейм по ширине canvas
+        def _resize_inner(event):
+            self._fert_cards_canvas.itemconfig("inner_win", width=event.width)
+        self._fert_cards_canvas.bind("<Configure>", _resize_inner)
+
         # правая панель — детальный просмотр
         self._fert_detail = tk.Frame(body, bg=COLOR_CARD,
                                      highlightbackground=COLOR_BORDER, highlightthickness=1)
-        self._fert_detail.pack(side="left", fill="both", expand=True)
+        self._fert_detail.pack(side="left", fill="both", expand=True, padx=(GAP_PANELS, 0))
 
         self._fert_widgets = []  # [(card_frame, fert_id), ...]
         self._selected_fert_id = None
@@ -116,7 +135,7 @@ class FertilizersTab:
             note = (fert["note"] or "").lower()
             match = not query or query in name or query in form or query in note
             if match:
-                card_frame.pack(fill="x", pady=(0, 4), padx=2)
+                card_frame.pack(fill="x", pady=(0, CARD_GAP))
             else:
                 card_frame.pack_forget()
 
@@ -150,10 +169,10 @@ class FertilizersTab:
 
         card = tk.Frame(parent, bg=COLOR_CARD, cursor="hand2",
                         highlightbackground=COLOR_BORDER, highlightthickness=1)
-        card.pack(fill="x", pady=(0, 4), padx=2)
+        card.pack(fill="x", pady=(0, CARD_GAP))
 
         inner = tk.Frame(card, bg=COLOR_CARD)
-        inner.pack(fill="x", padx=10, pady=8)
+        inner.pack(fill="x", padx=CARD_PAD, pady=10)
 
         # строка 1: название + форма
         hdr = tk.Frame(inner, bg=COLOR_CARD)
@@ -162,13 +181,13 @@ class FertilizersTab:
                  font=(FF, 11, "bold")).pack(side="left")
         if f.get("form"):
             tk.Label(hdr, text=f["form"], bg=COLOR_ALT_ROW, fg=COLOR_TEXT_MUTED,
-                     font=(FF, 8), padx=5, pady=1).pack(side="right")
+                     font=(FF, 8), padx=6, pady=2).pack(side="right")
 
         # мини-бары состава (только непустые элементы)
         active = [(ek, f.get(ek, 0) or 0) for ek in ELEMENT_KEYS if (f.get(ek, 0) or 0) > 0]
         if active:
             bars_frame = tk.Frame(inner, bg=COLOR_CARD)
-            bars_frame.pack(fill="x", pady=(6, 0))
+            bars_frame.pack(fill="x", pady=(8, 0))
             max_val = max(v for _, v in active) or 1.0
             for ek, val in active:
                 row = tk.Frame(bars_frame, bg=COLOR_CARD)
@@ -176,11 +195,11 @@ class FertilizersTab:
                 color = ELEMENT_COLORS.get(ek, COLOR_ACCENT)
                 ru = ELEMENT_RU.get(ek, ek)
                 formula = ELEMENT_FORMULA.get(ek, ek)
-                tk.Label(row, text=f"{ru}", bg=COLOR_CARD, fg=COLOR_TEXT_MUTED,
-                         font=(FF, 8), width=10, anchor="w").pack(side="left")
+                tk.Label(row, text=f"{ru} ({formula})", bg=COLOR_CARD, fg=COLOR_TEXT_MUTED,
+                         font=(FF, 8), width=12, anchor="w").pack(side="left")
                 # трек
                 track = tk.Frame(row, bg="#2a2015", height=8)
-                track.pack(side="left", fill="x", expand=True, padx=(0, 4))
+                track.pack(side="left", fill="x", expand=True, padx=(0, 6))
                 track.pack_propagate(False)
                 # бар
                 bar_w = max(4, int(200 * (val / max_val)))
@@ -198,7 +217,7 @@ class FertilizersTab:
             self._select_fert_card(_fid)
             self.edit_fertilizer()
 
-        for w in (card, inner):
+        for w in (card, inner, *inner.winfo_children()):
             w.bind("<Button-1>", _on_click)
             w.bind("<Double-1>", _on_dbl_click)
 
@@ -232,28 +251,27 @@ class FertilizersTab:
                      bg=COLOR_CARD, fg=COLOR_TEXT_MUTED, font=(FF, 10)).pack(pady=40)
             return
 
-        # заголовок
-        hdr = tk.Frame(self._fert_detail, bg=COLOR_BG)
-        hdr.pack(fill="x", padx=16, pady=(16, 4))
-        tk.Label(hdr, text=f["name"] or "Без названия", font=(FF, 14, "bold"),
-                 bg=COLOR_BG, fg=COLOR_TEXT).pack(side="left")
+        P = DETAIL_PAD  # единый внутренний отступ
 
-        # кнопки
-        btn_frame = tk.Frame(hdr, bg=COLOR_BG)
-        btn_frame.pack(side="right")
-        tk.Button(btn_frame, text="Редактировать", font=(FF, 9), relief="flat",
+        # заголовок + кнопки — единый ряд
+        hdr = tk.Frame(self._fert_detail, bg=COLOR_CARD)
+        hdr.pack(fill="x", padx=P, pady=(P, 4))
+        tk.Label(hdr, text=f["name"] or "Без названия", font=(FF, 14, "bold"),
+                 bg=COLOR_CARD, fg=COLOR_TEXT).pack(side="left")
+
+        tk.Button(hdr, text="Редактировать", font=(FF, 9), relief="flat",
                   bg=COLOR_ACCENT, fg="#151515", activebackground=COLOR_ACCENT_HOVER,
                   borderwidth=0, padx=12, pady=4, command=self.edit_fertilizer,
-                  cursor="hand2").pack(side="left", padx=(0, 6))
-        tk.Button(btn_frame, text="Удалить", font=(FF, 9), relief="flat",
-                  bg=COLOR_CARD, fg=COLOR_TEXT, activebackground=COLOR_ALT_ROW,
+                  cursor="hand2").pack(side="right", padx=(6, 0))
+        tk.Button(hdr, text="Удалить", font=(FF, 9), relief="flat",
+                  bg=COLOR_ALT_ROW, fg=COLOR_TEXT_MUTED, activebackground=COLOR_BORDER,
                   borderwidth=0, padx=12, pady=4, command=self.delete_fertilizer_selected,
-                  cursor="hand2").pack(side="left")
+                  cursor="hand2").pack(side="right")
 
         # форма
         if f.get("form"):
-            tk.Label(self._fert_detail, text=f["form"], bg=COLOR_BG,
-                     fg=COLOR_TEXT_MUTED, font=(FF, 10)).pack(anchor="w", padx=16, pady=(0, 12))
+            tk.Label(self._fert_detail, text=f["form"], bg=COLOR_CARD,
+                     fg=COLOR_TEXT_MUTED, font=(FF, 10)).pack(anchor="w", padx=P, pady=(2, 0))
 
         # --- Макроэлементы ---
         self._detail_section(self._fert_detail, "Макроэлементы", MACRO_KEYS, f)
@@ -263,18 +281,20 @@ class FertilizersTab:
 
         # --- Заметка ---
         if f.get("note"):
-            ttk.Separator(self._fert_detail).pack(fill="x", padx=16, pady=8)
+            ttk.Separator(self._fert_detail).pack(fill="x", padx=P, pady=10)
             tk.Label(self._fert_detail, text="Заметка", font=(FF, 10, "bold"),
-                     bg=COLOR_BG, fg=COLOR_ACCENT).pack(anchor="w", padx=16)
+                     bg=COLOR_CARD, fg=COLOR_ACCENT).pack(anchor="w", padx=P)
             tk.Label(self._fert_detail, text=f["note"], font=(FF, 9),
-                     bg=COLOR_BG, fg=COLOR_TEXT_MUTED, wraplength=400,
-                     anchor="w", justify="left").pack(anchor="w", padx=16, pady=(2, 0))
+                     bg=COLOR_CARD, fg=COLOR_TEXT_MUTED, wraplength=400,
+                     anchor="w", justify="left").pack(anchor="w", padx=P, pady=(4, P))
 
     def _detail_section(self, parent, title, keys, fert):
         FF = self.FF
-        ttk.Separator(parent).pack(fill="x", padx=16, pady=8)
+        P = DETAIL_PAD
+
+        ttk.Separator(parent).pack(fill="x", padx=P, pady=10)
         tk.Label(parent, text=title, font=(FF, 10, "bold"),
-                 bg=COLOR_BG, fg=COLOR_ACCENT).pack(anchor="w", padx=16, pady=(0, 6))
+                 bg=COLOR_CARD, fg=COLOR_ACCENT).pack(anchor="w", padx=P, pady=(0, SECTION_GAP))
 
         for ek in keys:
             val = fert.get(ek, 0) or 0
@@ -282,23 +302,26 @@ class FertilizersTab:
             ru = ELEMENT_RU.get(ek, ek)
             formula = ELEMENT_FORMULA.get(ek, ek)
 
-            row = tk.Frame(parent, bg=COLOR_BG)
-            row.pack(fill="x", padx=16, pady=2)
+            row = tk.Frame(parent, bg=COLOR_CARD)
+            row.pack(fill="x", padx=P, pady=ROW_GAP)
 
             # цветной индикатор
-            tk.Frame(row, bg=color, width=4, height=20).pack(side="left", padx=(0, 8))
+            ind = tk.Frame(row, bg=color, width=4, height=20)
+            ind.pack(side="left", padx=(0, 10))
+            ind.pack_propagate(False)
             # название
-            tk.Label(row, text=f"{ru} ({formula})", bg=COLOR_BG, fg=COLOR_TEXT,
+            tk.Label(row, text=f"{ru} ({formula})", bg=COLOR_CARD, fg=COLOR_TEXT,
                      font=(FF, 10), width=18, anchor="w").pack(side="left")
             # значение
             val_text = f"{val:.2f} мг/мл" if val > 0 else "—"
             val_color = COLOR_TEXT if val > 0 else "#3a3d48"
-            tk.Label(row, text=val_text, bg=COLOR_BG, fg=val_color,
-                     font=(FF, 10, "bold" if val > 0 else "normal")).pack(side="left")
+            tk.Label(row, text=val_text, bg=COLOR_CARD, fg=val_color,
+                     font=(FF, 10, "bold" if val > 0 else "normal"),
+                     width=14, anchor="w").pack(side="left")
             # бар
             if val > 0:
                 bar_bg = tk.Frame(row, bg="#2a2015", height=10, width=160)
-                bar_bg.pack(side="left", padx=(16, 0))
+                bar_bg.pack(side="left", padx=(12, 0))
                 bar_bg.pack_propagate(False)
                 max_in_group = max((fert.get(k, 0) or 0) for k in keys) or 1.0
                 bar_w = max(4, int(160 * (val / max_in_group)))
@@ -391,11 +414,11 @@ class FertilizersTab:
         dlg.resizable(False, False)
         dlg.geometry("580x700")
 
-        pad = dict(padx=16, pady=3)
+        P = 20  # единый отступ внутри диалога
 
         # --- название ---
         name_frame = tk.Frame(dlg, bg=COLOR_BG)
-        name_frame.pack(fill="x", **pad, pady=(16, 4))
+        name_frame.pack(fill="x", padx=P, pady=(P, 6))
         tk.Label(name_frame, text="Название:", width=16, anchor="w",
                  font=(FF, 10), bg=COLOR_BG, fg=COLOR_TEXT_SOFT).pack(side="left")
         name_var = tk.StringVar(value=fert["name"] if fert else "")
@@ -404,7 +427,7 @@ class FertilizersTab:
 
         # --- форма ---
         form_frame = tk.Frame(dlg, bg=COLOR_BG)
-        form_frame.pack(fill="x", **pad)
+        form_frame.pack(fill="x", padx=P, pady=6)
         tk.Label(form_frame, text="Форма:", width=16, anchor="w",
                  font=(FF, 10), bg=COLOR_BG, fg=COLOR_TEXT_SOFT).pack(side="left")
         form_var = tk.StringVar(value=fert["form"] if fert else "Жидкое (мг/мл)")
@@ -414,22 +437,24 @@ class FertilizersTab:
         form_combo.pack(side="left", fill="x", expand=True)
 
         # --- разделитель ---
-        ttk.Separator(dlg).pack(fill="x", padx=16, pady=10)
+        ttk.Separator(dlg).pack(fill="x", padx=P, pady=12)
         tk.Label(dlg, text="Концентрации элементов (мг на единицу)",
                  font=(FF, 10, "bold"), bg=COLOR_BG, fg=COLOR_ACCENT).pack(
-            anchor="w", padx=16)
+            anchor="w", padx=P, pady=(0, 8))
 
         # --- макроэлементы ---
         macro_frame = tk.LabelFrame(dlg, text="  Макроэлементы  ", font=(FF, 9, "bold"),
                                     bg=COLOR_BG, fg=COLOR_TEXT_MUTED, bd=1, relief="groove")
-        macro_frame.pack(fill="x", padx=16, pady=(6, 4))
+        macro_frame.pack(fill="x", padx=P, pady=(0, 6))
 
         elem_vars = {}
         for ek in MACRO_KEYS:
             row = tk.Frame(macro_frame, bg=COLOR_BG)
-            row.pack(fill="x", padx=8, pady=3)
+            row.pack(fill="x", padx=10, pady=4)
             color = ELEMENT_COLORS.get(ek, COLOR_ACCENT)
-            tk.Frame(row, bg=color, width=4, height=18).pack(side="left", padx=(0, 6))
+            ind = tk.Frame(row, bg=color, width=4, height=18)
+            ind.pack(side="left", padx=(0, 8))
+            ind.pack_propagate(False)
             ru = ELEMENT_RU[ek]
             formula = ELEMENT_FORMULA[ek]
             tk.Label(row, text=f"{ru} ({formula}):", font=(FF, 9),
@@ -437,7 +462,7 @@ class FertilizersTab:
             val = fert.get(ek) if fert else 0.0
             var = tk.StringVar(value=f"{val:g}" if val is not None and val != 0 else "")
             entry = ttk.Entry(row, textvariable=var, width=12, justify="center")
-            entry.pack(side="left", padx=(0, 4))
+            entry.pack(side="left", padx=(0, 6))
             tk.Label(row, text="мг/мл", font=(FF, 8), bg=COLOR_BG,
                      fg=COLOR_TEXT_MUTED).pack(side="left")
             elem_vars[ek] = var
@@ -445,13 +470,15 @@ class FertilizersTab:
         # --- микроэлементы ---
         micro_frame = tk.LabelFrame(dlg, text="  Микроэлементы  ", font=(FF, 9, "bold"),
                                     bg=COLOR_BG, fg=COLOR_TEXT_MUTED, bd=1, relief="groove")
-        micro_frame.pack(fill="x", padx=16, pady=4)
+        micro_frame.pack(fill="x", padx=P, pady=6)
 
         for ek in MICRO_KEYS:
             row = tk.Frame(micro_frame, bg=COLOR_BG)
-            row.pack(fill="x", padx=8, pady=3)
+            row.pack(fill="x", padx=10, pady=4)
             color = ELEMENT_COLORS.get(ek, COLOR_ACCENT)
-            tk.Frame(row, bg=color, width=4, height=18).pack(side="left", padx=(0, 6))
+            ind = tk.Frame(row, bg=color, width=4, height=18)
+            ind.pack(side="left", padx=(0, 8))
+            ind.pack_propagate(False)
             ru = ELEMENT_RU[ek]
             formula = ELEMENT_FORMULA[ek]
             tk.Label(row, text=f"{ru} ({formula}):", font=(FF, 9),
@@ -459,26 +486,26 @@ class FertilizersTab:
             val = fert.get(ek) if fert else 0.0
             var = tk.StringVar(value=f"{val:g}" if val is not None and val != 0 else "")
             entry = ttk.Entry(row, textvariable=var, width=12, justify="center")
-            entry.pack(side="left", padx=(0, 4))
+            entry.pack(side="left", padx=(0, 6))
             tk.Label(row, text="мг/мл", font=(FF, 8), bg=COLOR_BG,
                      fg=COLOR_TEXT_MUTED).pack(side="left")
             elem_vars[ek] = var
 
         # --- заметка ---
-        ttk.Separator(dlg).pack(fill="x", padx=16, pady=10)
+        ttk.Separator(dlg).pack(fill="x", padx=P, pady=12)
         tk.Label(dlg, text="Заметка:", font=(FF, 10, "bold"),
-                 bg=COLOR_BG, fg=COLOR_ACCENT).pack(anchor="w", padx=16)
+                 bg=COLOR_BG, fg=COLOR_ACCENT).pack(anchor="w", padx=P, pady=(0, 6))
         note_text = tk.Text(dlg, width=60, height=3, font=(FF, 9),
                             bg=COLOR_CARD, fg=COLOR_TEXT, insertbackground=COLOR_TEXT,
                             relief="flat", borderwidth=1, highlightbackground=COLOR_BORDER,
                             highlightthickness=1, wrap="word")
-        note_text.pack(fill="x", padx=16, pady=(2, 4))
+        note_text.pack(fill="x", padx=P, pady=(0, 6))
         if fert and fert.get("note"):
             note_text.insert("1.0", fert["note"])
 
         # --- кнопки ---
         btn_row = tk.Frame(dlg, bg=COLOR_BG)
-        btn_row.pack(fill="x", padx=16, pady=(8, 16))
+        btn_row.pack(fill="x", padx=P, pady=(12, P))
 
         def _save():
             name = name_var.get().strip()
@@ -498,11 +525,11 @@ class FertilizersTab:
 
         tk.Button(btn_row, text="Отмена", font=(FF, 9), relief="flat",
                   bg=COLOR_CARD, fg=COLOR_TEXT, activebackground=COLOR_ALT_ROW,
-                  borderwidth=0, padx=14, pady=4, command=_cancel,
+                  borderwidth=0, padx=14, pady=5, command=_cancel,
                   cursor="hand2").pack(side="right", padx=(8, 0))
         tk.Button(btn_row, text="Сохранить", font=(FF, 9, "bold"), relief="flat",
                   bg=COLOR_ACCENT, fg="#151515", activebackground=COLOR_ACCENT_HOVER,
-                  activeforeground="#151515", borderwidth=0, padx=14, pady=4,
+                  activeforeground="#151515", borderwidth=0, padx=14, pady=5,
                   command=_save, cursor="hand2").pack(side="right")
 
         dlg._result = None
