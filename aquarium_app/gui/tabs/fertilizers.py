@@ -86,7 +86,7 @@ class FertilizersTab:
         left.pack(side="left", fill="y")
         left.pack_propagate(False)
 
-        # прокручиваемая область карточек (скроллбар скрытый, только колесо)
+        # область карточек (обычный фрейм с вертикальным скроллбаром)
         self._fert_cards_canvas = tk.Canvas(left, bg=COLOR_BG, highlightthickness=0)
         self._fert_cards_inner = tk.Frame(self._fert_cards_canvas, bg=COLOR_BG)
         self._fert_cards_inner.bind(
@@ -96,16 +96,22 @@ class FertilizersTab:
         )
         self._fert_cards_canvas.create_window((0, 0), window=self._fert_cards_inner, anchor="nw",
                                                tags="inner_win")
+
+        # вертикальный скроллбар
+        fert_sb = ttk.Scrollbar(left, orient="vertical",
+                                 command=self._fert_cards_canvas.yview)
+        self._fert_cards_canvas.configure(yscrollcommand=fert_sb.set)
+        fert_sb.pack(side="right", fill="y")
         self._fert_cards_canvas.pack(side="left", fill="both", expand=True)
-        self._fert_cards_canvas.bind("<Enter>",
-            lambda e: self._fert_cards_canvas.bind_all("<MouseWheel>", self._fert_cards_wheel))
-        self._fert_cards_canvas.bind("<Leave>",
-            lambda e: self._fert_cards_canvas.unbind_all("<MouseWheel>"))
 
         # растянуть внутренний фрейм по ширине canvas
         def _resize_inner(event):
             self._fert_cards_canvas.itemconfig("inner_win", width=event.width)
         self._fert_cards_canvas.bind("<Configure>", _resize_inner)
+
+        # колёсико мыши для прокрутки (только когда курсор над панелью)
+        self._fert_cards_canvas.bind("<Enter>", self._fert_canvas_enter)
+        self._fert_cards_canvas.bind("<Leave>", self._fert_canvas_leave)
 
         # правая панель — детальный просмотр
         self._fert_detail = tk.Frame(body, bg=COLOR_CARD,
@@ -119,6 +125,12 @@ class FertilizersTab:
 
     def _fert_cards_wheel(self, event):
         self._fert_cards_canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+
+    def _fert_canvas_enter(self, event):
+        self._fert_cards_canvas.bind_all("<MouseWheel>", self._fert_cards_wheel)
+
+    def _fert_canvas_leave(self, event):
+        self._fert_cards_canvas.unbind_all("<MouseWheel>")
 
     # ------------------------------------------------------------------
     # Фильтрация по поиску

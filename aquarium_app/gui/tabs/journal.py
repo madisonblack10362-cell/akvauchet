@@ -117,10 +117,15 @@ class JournalTab:
                 scrollregion=self.journal_canvas.bbox("all")),
         )
         self.journal_canvas.create_window((0, 0), window=self.journal_scroll_inner,
-                                           anchor="nw")
+                                           anchor="nw", tags="scroll_inner")
         self.journal_canvas.configure(yscrollcommand=sb.set)
         sb.pack(side="right", fill="y")
         self.journal_canvas.pack(side="left", fill="both", expand=True)
+
+        # растянуть внутренний фрейм по ширине canvas
+        def _resize_journal_inner(event):
+            self.journal_canvas.itemconfig("scroll_inner", width=event.width)
+        self.journal_canvas.bind("<Configure>", _resize_journal_inner)
 
         self.journal_canvas.bind("<Enter>",
                                   lambda e: self.journal_canvas.bind_all(
@@ -314,7 +319,7 @@ class JournalTab:
 
         card = tk.Frame(parent, bg=COLOR_CARD, bd=0,
                         highlightbackground=COLOR_BORDER, highlightthickness=1)
-        card.pack(fill="x", pady=(0, 6), padx=2)
+        card.pack(fill="x", pady=(0, 6))
 
         inner = tk.Frame(card, bg=COLOR_CARD)
         inner.pack(fill="x", padx=10, pady=8)
