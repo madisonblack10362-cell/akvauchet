@@ -394,8 +394,9 @@ def draw_daily_bars_chart(
             d_map[d] = v
         raw_daily[key] = d_map
 
-    all_dates_sorted = sorted(set(d for dm in raw_daily.values() for d in dm))
-    if not all_dates_sorted:
+    # Минимальная и максимальная даты из всех элементов
+    raw_dates_set = set(d for dm in raw_daily.values() for d in dm)
+    if not raw_dates_set:
         canvas.config(height=80)
         canvas.delete("all")
         canvas.update_idletasks()
@@ -404,6 +405,24 @@ def draw_daily_bars_chart(
                            fill=COLOR_TEXT_MUTED, font=(font_family, 8, "italic"))
         canvas._hover_points = []
         return
+
+    # ---- период (вычисляем до cumulative) ----
+    today = dt.date.today()
+    if since_iso:
+        try:
+            period_start = _parse_date(since_iso)
+        except Exception:
+            period_start = min(raw_dates_set)
+    elif days is not None:
+        period_start = today - dt.timedelta(days=days)
+    else:
+        period_start = min(raw_dates_set)
+    period_end = max(raw_dates_set | {today})
+    span_days = max((period_end - period_start).days, 1)
+
+    # ВСЕ дни в периоде (включая дни без внесений)
+    all_dates_sorted = [period_start + dt.timedelta(days=i)
+                        for i in range(span_days + 1)]
 
     # Построить кумулятивные значения: для каждого элемента на каждый день
     # cumulative[key][date] = нарастающая сумма (carry forward)
@@ -435,20 +454,6 @@ def draw_daily_bars_chart(
     max_total = max(day_sums.values()) * 1.12 if day_sums else 1.0
     if max_total == 0:
         max_total = 1.0
-
-    # ---- период ----
-    today = dt.date.today()
-    if since_iso:
-        try:
-            period_start = _parse_date(since_iso)
-        except Exception:
-            period_start = min(all_dates_sorted)
-    elif days is not None:
-        period_start = today - dt.timedelta(days=days)
-    else:
-        period_start = min(all_dates_sorted)
-    period_end = max(all_dates_sorted + [today])
-    span_days = max((period_end - period_start).days, 1)
 
     # ---- размеры ----
     chart_h = 230
@@ -491,7 +496,16 @@ def draw_daily_bars_chart(
 
     # ---- ширина столбиков ----
     n_dates = len(all_dates_sorted)
-    bar_w = max(12, min(40, plot_w / max(n_dates, 1) * 0.55))
+    bar_w = max(2, min(40, plot_w / max(n_dates, 1) * 0.7))
+
+    # шаг подписей дат: если дней много — подписываем через N
+    date_label_step = 1
+    if n_dates > 60:
+        date_label_step = 7
+    elif n_dates > 30:
+        date_label_step = 3
+    elif n_dates > 14:
+        date_label_step = 2
 
     hover_points = []
 
@@ -531,7 +545,9 @@ def draw_daily_bars_chart(
 
     # ---- ось X: даты под столбиками ----
     dates_y = chart_bottom + 4
-    for d in all_dates_sorted:
+    for idx, d in enumerate(all_dates_sorted):
+        if idx % date_label_step != 0 and idx != n_dates - 1:
+            continue
         dx = x_for_date(d)
         canvas.create_text(dx, dates_y, anchor="n",
                            text=d.strftime("%d.%m"),
