@@ -335,6 +335,8 @@ class DosingTab:
         combo["values"] = names
         if names and not combo.get():
             combo.current(0)
+        if combo.get():
+            self.refresh_dosing_table()
 
     def _refresh_fert_dropdown(self):
         combo = getattr(self, "dose_fert_combo", None)

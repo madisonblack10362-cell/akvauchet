@@ -201,6 +201,7 @@ class ReadingsTab:
         self.readings_aq_combo["values"] = items
         if items and not self.readings_aq_var.get():
             self.readings_aq_combo.current(0)
+        if self.readings_aq_var.get():
             self._on_readings_aq_changed()
 
     def _on_readings_aq_changed(self):
