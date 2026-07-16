@@ -42,6 +42,10 @@ class FertilizersTab:
                  bg=COLOR_BG, fg=COLOR_TEXT).pack(side="left")
 
         # поиск
+        self._fert_widgets = []  # инициализация ДО trace
+        self._selected_fert_id = None
+        self.fert_tree = None
+
         search_frame = tk.Frame(top, bg=COLOR_BG)
         search_frame.pack(side="left", padx=(24, 0))
         self._fert_search_var = tk.StringVar()
@@ -50,7 +54,7 @@ class FertilizersTab:
         search_entry.pack(side="left")
         search_entry.insert(0, "Поиск...")
         search_entry.bind("<FocusIn>", lambda e: (search_entry.delete(0, "end"),
-                                                   self._fert_search_var.trace_add("write", lambda *_: self._filter_fert_cards())))
+                                                   self._filter_fert_cards()))
         search_entry.bind("<FocusOut>", lambda e: (search_entry.delete(0, "end"),
                                                     search_entry.insert(0, "Поиск..."),
                                                     self._fert_search_var.set("")))
@@ -94,9 +98,7 @@ class FertilizersTab:
 
         self._fert_widgets = []  # [(card_frame, fert_id), ...]
         self._selected_fert_id = None
-
         self.fert_tree = None  # для совместимости с _refresh_fert_dropdown
-        self.fert_tree.after = lambda ms, fn: None  # заглушка
         self.after(100, self.refresh_ferts)
 
     def _fert_cards_wheel(self, event):
