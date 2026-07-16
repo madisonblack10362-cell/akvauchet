@@ -15,7 +15,12 @@ def compute_deltas(fert_row, dose, volume_l):
     """Прирост каждого элемента, мг/л, от заданной дозы удобрения."""
     if not volume_l:
         return {k: 0.0 for k in ELEMENT_KEYS}
-    return {k: (fert_row[k] or 0.0) * dose / volume_l for k in ELEMENT_KEYS}
+    result = {}
+    for k in ELEMENT_KEYS:
+        # поддерживаем оба варианта ключей: po4 и f_po4
+        v = fert_row.get(k) or fert_row.get(f"f_{k}") or 0.0
+        result[k] = v * dose / volume_l
+    return result
 
 
 def sum_last_n_days(conn, aq_id, n=7):

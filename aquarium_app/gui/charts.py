@@ -235,7 +235,9 @@ def draw_param_trend_chart(
         strip_top = pad_t + idx * (strip_h + gap)
         strip_bottom = strip_top + strip_h
 
-        vals = [v for _, v in hist]
+        vals = [v for _, v in hist if isinstance(v, (int, float))]
+        if not vals:
+            continue
         local_max = max(vals) * 1.1
         local_min = min(0, min(vals))
         if local_max == local_min:
@@ -425,7 +427,7 @@ def draw_daily_bars_chart(
             canvas.create_rectangle(0, strip_top - gap / 2, w, strip_bottom + gap / 2,
                                     fill="#14161f", outline="")
 
-        vals = [v for _, v in hist]
+        vals = [v for _, v in hist if isinstance(v, (int, float))]
         local_max = max(vals) * 1.15 if vals else 1.0
         if local_max == 0:
             local_max = 1.0
