@@ -124,7 +124,7 @@ class ReadingsTab:
         wc_entry = ttk.Entry(row_wc, textvariable=self.read_wc_l_var, width=8)
         wc_entry.pack(side="left")
         wc_entry.bind("<KeyRelease>", lambda e: self._update_read_wc_pct())
-        ttk.Label(row_wc, text="л", background=COLOR_CARD, fg=COLOR_TEXT_MUTED).pack(
+        ttk.Label(row_wc, text="л", background=COLOR_CARD, foreground=COLOR_TEXT_MUTED).pack(
             side="left", padx=(2, 12))
         self.read_wc_pct_label = tk.Label(row_wc, text="= —%", bg=COLOR_CARD,
                                           fg=COLOR_TEXT_MUTED, font=(FF, 9))
