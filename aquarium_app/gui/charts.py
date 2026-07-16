@@ -73,6 +73,16 @@ def _lighten(hex_color, factor=0.25):
     return f"#{r:02x}{g:02x}{b:02x}"
 
 
+def _darken(hex_color, factor=0.3):
+    """Затемняет hex-цвет."""
+    hex_color = hex_color.lstrip("#")
+    r, g, b = int(hex_color[:2], 16), int(hex_color[2:4], 16), int(hex_color[4:], 16)
+    r = max(0, int(r * (1 - factor)))
+    g = max(0, int(g * (1 - factor)))
+    b = max(0, int(b * (1 - factor)))
+    return f"#{r:02x}{g:02x}{b:02x}"
+
+
 # ---------------------------------------------------------------------------
 # draw_element_bars — горизонтальная диаграмма прироста на дашборде
 # ---------------------------------------------------------------------------
@@ -416,10 +426,11 @@ def draw_daily_bars_chart(
     span_days = max((period_end - period_start).days, 1)
 
     # ---- размеры canvas ----
-    chart_h = 220
-    legend_h = 24
-    pad_l, pad_r, pad_t, pad_b = 44, 12, 10, 24
-    h = pad_t + chart_h + legend_h + pad_b
+    chart_h = 230
+    legend_h = 20
+    dates_h = 16
+    pad_l, pad_r, pad_t, pad_b = 46, 14, 8, 6
+    h = pad_t + chart_h + dates_h + legend_h + pad_b
     canvas.config(height=h)
 
     canvas.delete("all")
@@ -435,28 +446,41 @@ def draw_daily_bars_chart(
     chart_top = pad_t
     chart_bottom = pad_t + chart_h
 
-    # ---- сетка ----
-    for frac in [0.0, 0.25, 0.5, 0.75, 1.0]:
+    # ---- единица измерения сверху ----
+    canvas.create_text(pad_l + plot_w, chart_top - 1, anchor="ne",
+                       text="мг/л", fill="#3a3d48", font=(font_family, 7))
+
+    # ---- сетка (только 0, 0.5, 1.0 доли) ----
+    grid_fracs = [0.0, 0.5, 1.0]
+    # добавляем промежуточные если максимум большой
+    if global_max > 0.5:
+        grid_fracs = [0.0, 0.25, 0.5, 0.75, 1.0]
+    for frac in grid_fracs:
         y = chart_bottom - chart_h * frac
         val = global_max * frac
-        is_edge = frac in (0.0, 1.0)
+        is_zero = (frac == 0.0)
         canvas.create_line(pad_l, y, pad_l + plot_w, y,
-                            fill="#2c2f3a" if is_edge else "#1a1c24",
+                            fill="#2c2f3a" if is_zero else "#181a22",
                             width=1)
-        canvas.create_text(pad_l - 5, y, anchor="e",
+        canvas.create_text(pad_l - 6, y, anchor="e",
                            text=fmt_axis(val),
-                           fill=COLOR_TEXT_MUTED if is_edge else "#3a3d48",
+                           fill=COLOR_TEXT_MUTED if is_zero else "#2e313b",
                            font=(font_family, 7))
 
     # ---- рисуем столбики ----
-    group_w = max(10, min(60, plot_w / max(len(all_dates_sorted), 1) * 0.75))
-    bar_w = max(3, (group_w - (n_elem - 1) * 1) / n_elem)
-    min_bar_h = 3
+    n_dates = len(all_dates_sorted)
+    # адаптивная ширина: чем больше дат — тем тоньше, но не менее 4px
+    max_group = plot_w / max(n_dates, 1) * 0.82
+    group_w = max(n_elem * 5, min(max_group, 70))
+    bar_gap = 2  # зазор между столбиками в группе
+    bar_w = max(4, (group_w - (n_elem - 1) * bar_gap) / n_elem)
+    # пересчитываем реальную ширину группы
+    total_bar_w = n_elem * bar_w + (n_elem - 1) * bar_gap
+    min_bar_h = 4
 
     hover_points = []
 
     for d in all_dates_sorted:
-        # d уже dt.date — не нужно парсить
         d_iso = d.isoformat()
         gx = x_for_date(d)
 
@@ -472,7 +496,6 @@ def draw_daily_bars_chart(
         if not day_vals:
             continue
 
-        total_bar_w = n_elem * bar_w + (n_elem - 1) * 1
         group_left = gx - total_bar_w / 2
 
         for ei, (key, color, label, hist) in enumerate(elem_data):
@@ -480,72 +503,70 @@ def draw_daily_bars_chart(
             if v is None:
                 continue
 
-            bx = group_left + ei * (bar_w + 1)
+            bx = group_left + ei * (bar_w + bar_gap)
             frac = v / global_max
             bar_h = max(min_bar_h, chart_h * frac)
             bar_top = chart_bottom - bar_h
 
-            # тень
-            canvas.create_rectangle(bx + 1, bar_top + 1,
-                                    bx + bar_w + 1, chart_bottom + 1,
-                                    fill="#08090c", outline="")
-            # основной столбик
+            # основной столбик (с градиентом: низ темнее, верх светлее)
             canvas.create_rectangle(bx, bar_top, bx + bar_w, chart_bottom,
+                                    fill=_darken(color, 0.15), outline="")
+            # верхняя половина — основной цвет
+            mid_y = bar_top + bar_h * 0.4
+            canvas.create_rectangle(bx, bar_top, bx + bar_w, mid_y,
                                     fill=color, outline="")
-            # верхняя шапка (3D эффект)
-            cap_h = min(3, bar_h)
+            # блик сверху
+            cap_h = min(4, bar_h * 0.3)
             if cap_h >= 1:
-                canvas.create_rectangle(bx, bar_top, bx + bar_w, bar_top + cap_h,
-                                        fill=_lighten(color, 0.35), outline="")
+                canvas.create_rectangle(bx + 1, bar_top, bx + bar_w - 1, bar_top + cap_h,
+                                        fill=_lighten(color, 0.4), outline="")
 
-            # подпись значения
+            # подпись значения — только над высокими столбиками
             val_str = fmt_axis(v)
-            if bar_h > 16:
-                canvas.create_text(bx + bar_w / 2, bar_top + 4, anchor="n",
-                                   text=val_str, fill="#ffffff",
-                                   font=(font_family, 6, "bold"))
-            else:
-                canvas.create_text(bx + bar_w / 2, bar_top - 3, anchor="s",
-                                   text=val_str, fill=_lighten(color, 0.3),
-                                   font=(font_family, 6, "bold"))
+            if bar_h > 20:
+                canvas.create_text(bx + bar_w / 2, bar_top + 5, anchor="n",
+                                   text=val_str, fill="#d0d0d0",
+                                   font=(font_family, 7, "bold"))
 
             hover_points.append({"x": bx + bar_w / 2, "y": bar_top,
                                   "date": d_iso, "value": v,
                                   "label": label, "color": color})
 
     # ---- ось X (даты) ----
-    axis_y = chart_bottom + 3
-    canvas.create_text(pad_l, axis_y, anchor="nw",
-                       text=period_start.strftime("%d.%m"),
-                       fill=COLOR_TEXT_MUTED, font=(font_family, 7))
-    canvas.create_text(pad_l + plot_w, axis_y, anchor="ne",
-                       text=period_end.strftime("%d.%m"),
-                       fill=COLOR_TEXT_MUTED, font=(font_family, 7))
-    # промежуточные даты
-    if span_days > 4:
-        step = max(1, span_days // 5)
-        d = period_start + dt.timedelta(days=step)
-        while d < period_end:
-            dx = x_for_date(d)
-            canvas.create_text(dx, axis_y, anchor="n",
-                               text=d.strftime("%d.%m"),
-                               fill="#3a3d48", font=(font_family, 7))
-            d += dt.timedelta(days=step)
+    dates_y = chart_bottom + 4
+    # рисуем дату под каждой группой столбиков
+    for d in all_dates_sorted:
+        dx = x_for_date(d)
+        canvas.create_text(dx, dates_y, anchor="n",
+                           text=d.strftime("%d.%m"),
+                           fill="#3a3d48", font=(font_family, 7))
+    # крайние даты контрастнее
+    if all_dates_sorted:
+        d_first, d_last = all_dates_sorted[0], all_dates_sorted[-1]
+        dx_first = x_for_date(d_first)
+        dx_last = x_for_date(d_last)
+        canvas.create_text(dx_first, dates_y, anchor="n",
+                           text=d_first.strftime("%d.%m"),
+                           fill=COLOR_TEXT_MUTED, font=(font_family, 7))
+        canvas.create_text(dx_last, dates_y, anchor="n",
+                           text=d_last.strftime("%d.%m"),
+                           fill=COLOR_TEXT_MUTED, font=(font_family, 7))
 
     # ---- легенда внизу ----
-    legend_y = chart_bottom + legend_h + 2
+    legend_y = dates_y + dates_h + 2
     lx = pad_l
     for key, color, label, hist in elem_data:
         vals = [v for _, v in hist if isinstance(v, (int, float))]
         total = sum(vals)
-        # цветной квадратик
-        canvas.create_rectangle(lx, legend_y - 5, lx + 8, legend_y + 3,
-                                fill=color, outline="")
-        canvas.create_text(lx + 12, legend_y - 1, anchor="w",
-                           text=f"{label}  {fmt_axis(total)}",
-                           fill=COLOR_TEXT_SOFT,
+        txt = f"{label} {fmt_axis(total)}"
+        # цветной кружок
+        canvas.create_oval(lx, legend_y - 4, lx + 8, legend_y + 4,
+                           fill=color, outline="")
+        canvas.create_text(lx + 12, legend_y, anchor="w",
+                           text=txt, fill=COLOR_TEXT_SOFT,
                            font=(font_family, 8))
-        lx += 12 + len(f"{label}  {fmt_axis(total)}") * 5 + 16
+        # примерная ширина текста
+        lx += 16 + len(txt) * 5 + 14
 
     # ---- hover ----
     canvas._hover_points = hover_points
