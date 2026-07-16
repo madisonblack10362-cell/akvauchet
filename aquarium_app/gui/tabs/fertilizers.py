@@ -23,21 +23,17 @@ MACRO_KEYS = ["no3", "po4", "k", "mg", "ca"]
 MICRO_KEYS = ["fe", "mn", "b", "zn", "cu", "mo", "co"]
 
 # ---------------------------------------------------------------------------
-# Единые константы отступов для всей вкладки
+# Единые константы отступов
 # ---------------------------------------------------------------------------
-PAD_X = 16          # горизонтальный отступ от края вкладки
-PAD_Y_TOP = 14      # отступ сверху до заголовка
-GAP_BODY = 10       # промежуток между верхней панелью и телом
-GAP_PANELS = 10     # промежуток между левой и правой панелями
-CARD_PAD = 10       # внутренний отступ карточки
-CARD_GAP = 6        # вертикальный промежуток между карточками
-DETAIL_PAD = 16     # внутренний отступ панели деталей
-SECTION_GAP = 4     # отступ после заголовка секции
-ROW_GAP = 3         # вертикальный промежуток между строками в секции
+PAD_X = 16
+PAD_Y_TOP = 14
+GAP_BODY = 10
+CARD_PAD = 10
+CARD_GAP = 6
 
 
 class FertilizersTab:
-    """Миксин-вкладка «Удобрения» — карточный интерфейс с визуальным составом."""
+    """Миксин-вкладка «Удобрения» — карточки на всю ширину."""
 
     # ------------------------------------------------------------------
     # Построение вкладки
@@ -47,7 +43,7 @@ class FertilizersTab:
         tab = self.tab_ferts
         FF = self.FF
 
-        # --- верхняя панель: заголовок + поиск + кнопка ---
+        # --- верхняя панель: заголовок + поиск + кнопки ---
         top = tk.Frame(tab, bg=COLOR_BG)
         top.pack(fill="x", padx=PAD_X, pady=(PAD_Y_TOP, 0))
 
@@ -55,7 +51,7 @@ class FertilizersTab:
                  bg=COLOR_BG, fg=COLOR_TEXT).pack(side="left")
 
         # поиск
-        self._fert_widgets = []  # инициализация ДО trace
+        self._fert_widgets = []
         self._selected_fert_id = None
         self.fert_tree = None
 
@@ -72,32 +68,36 @@ class FertilizersTab:
                                                     search_entry.insert(0, "Поиск..."),
                                                     self._fert_search_var.set("")))
 
+        # кнопки действий (справа)
+        self._fert_edit_btn = tk.Button(
+            top, text="Редактировать", font=(FF, 9), relief="flat",
+            bg=COLOR_ALT_ROW, fg=COLOR_TEXT_MUTED, activebackground=COLOR_BORDER,
+            borderwidth=0, padx=10, pady=5, command=self.edit_fertilizer,
+            cursor="hand2", state="disabled")
+        self._fert_edit_btn.pack(side="right", padx=(6, 0))
+
+        self._fert_del_btn = tk.Button(
+            top, text="Удалить", font=(FF, 9), relief="flat",
+            bg=COLOR_ALT_ROW, fg=COLOR_TEXT_MUTED, activebackground=COLOR_BORDER,
+            borderwidth=0, padx=10, pady=5, command=self.delete_fertilizer_selected,
+            cursor="hand2", state="disabled")
+        self._fert_del_btn.pack(side="right", padx=(0, 0))
+
         tk.Button(top, text="+ Добавить", font=(FF, 9, "bold"), relief="flat",
                   bg=COLOR_ACCENT, fg="#151515", activebackground=COLOR_ACCENT_HOVER,
                   activeforeground="#151515", borderwidth=0, padx=14, pady=5,
-                  command=self.add_fertilizer_dialog, cursor="hand2").pack(side="right")
+                  command=self.add_fertilizer_dialog, cursor="hand2").pack(side="right", padx=(0, 8))
 
-        # --- двухпанельная компоновка ---
+        # --- тело: карточки на всю ширину ---
         body = tk.Frame(tab, bg=COLOR_BG)
         body.pack(fill="both", expand=True, padx=PAD_X, pady=(GAP_BODY, PAD_X))
 
-        # левая панель — список карточек
-        left = tk.Frame(body, bg=COLOR_BG, width=380)
-        left.pack(side="left", fill="y")
-        left.pack_propagate(False)
+        self._fert_cards_inner = body
+        self._fert_detail = None  # не используется
 
-        # область карточек (простой фрейм, без прокрутки)
-        self._fert_cards_canvas = None
-        self._fert_cards_inner = left
-
-        # правая панель — детальный просмотр
-        self._fert_detail = tk.Frame(body, bg=COLOR_CARD,
-                                     highlightbackground=COLOR_BORDER, highlightthickness=1)
-        self._fert_detail.pack(side="left", fill="both", expand=True, padx=(GAP_PANELS, 0))
-
-        self._fert_widgets = []  # [(card_frame, fert_id), ...]
+        self._fert_widgets = []
         self._selected_fert_id = None
-        self.fert_tree = None  # для совместимости с _refresh_fert_dropdown
+        self.fert_tree = None
 
     # ------------------------------------------------------------------
     # Фильтрация по поиску
@@ -131,9 +131,9 @@ class FertilizersTab:
         for f in ferts:
             self._build_fert_card(f)
 
-        # показываем первый удобрение в деталях
+        # выделяем первый если ничего не выбрано
         if ferts and not self._selected_fert_id:
-            self._show_fert_detail(ferts[0]["id"])
+            self._select_fert_card(ferts[0]["id"])
 
         self._refresh_fert_dropdown()
 
@@ -188,6 +188,12 @@ class FertilizersTab:
                 tk.Label(row, text=f"{val:.1f}", bg=COLOR_CARD, fg=color,
                          font=(FF, 8, "bold"), width=6, anchor="e").pack(side="right")
 
+        # заметка (если есть, свёрнутая)
+        if f.get("note"):
+            tk.Label(inner, text=f["note"], bg=COLOR_CARD, fg=COLOR_TEXT_MUTED,
+                     font=(FF, 8, "italic"), wraplength=700, anchor="w",
+                     justify="left").pack(anchor="w", pady=(6, 0))
+
         # привязка кликов
         def _on_click(e, _fid=fid):
             self._select_fert_card(_fid)
@@ -213,99 +219,9 @@ class FertilizersTab:
                 card_frame.configure(highlightbackground=COLOR_ACCENT, highlightthickness=2)
             else:
                 card_frame.configure(highlightbackground=COLOR_BORDER, highlightthickness=1)
-        self._show_fert_detail(fid)
-
-    # ------------------------------------------------------------------
-    # Панель деталей
-    # ------------------------------------------------------------------
-
-    def _show_fert_detail(self, fid):
-        FF = self.FF
-        for w in self._fert_detail.winfo_children():
-            w.destroy()
-
-        f = get_fertilizer(self.conn, fid)
-        if not f:
-            tk.Label(self._fert_detail, text="Выберите удобрение слева",
-                     bg=COLOR_CARD, fg=COLOR_TEXT_MUTED, font=(FF, 10)).pack(pady=40)
-            return
-
-        P = DETAIL_PAD  # единый внутренний отступ
-
-        # заголовок + кнопки — единый ряд
-        hdr = tk.Frame(self._fert_detail, bg=COLOR_CARD)
-        hdr.pack(fill="x", padx=P, pady=(P, 4))
-        tk.Label(hdr, text=f["name"] or "Без названия", font=(FF, 14, "bold"),
-                 bg=COLOR_CARD, fg=COLOR_TEXT).pack(side="left")
-
-        tk.Button(hdr, text="Редактировать", font=(FF, 9), relief="flat",
-                  bg=COLOR_ACCENT, fg="#151515", activebackground=COLOR_ACCENT_HOVER,
-                  borderwidth=0, padx=12, pady=4, command=self.edit_fertilizer,
-                  cursor="hand2").pack(side="right", padx=(6, 0))
-        tk.Button(hdr, text="Удалить", font=(FF, 9), relief="flat",
-                  bg=COLOR_ALT_ROW, fg=COLOR_TEXT_MUTED, activebackground=COLOR_BORDER,
-                  borderwidth=0, padx=12, pady=4, command=self.delete_fertilizer_selected,
-                  cursor="hand2").pack(side="right")
-
-        # форма
-        if f.get("form"):
-            tk.Label(self._fert_detail, text=f["form"], bg=COLOR_CARD,
-                     fg=COLOR_TEXT_MUTED, font=(FF, 10)).pack(anchor="w", padx=P, pady=(2, 0))
-
-        # --- Макроэлементы ---
-        self._detail_section(self._fert_detail, "Макроэлементы", MACRO_KEYS, f)
-
-        # --- Микроэлементы ---
-        self._detail_section(self._fert_detail, "Микроэлементы", MICRO_KEYS, f)
-
-        # --- Заметка ---
-        if f.get("note"):
-            ttk.Separator(self._fert_detail).pack(fill="x", padx=P, pady=10)
-            tk.Label(self._fert_detail, text="Заметка", font=(FF, 10, "bold"),
-                     bg=COLOR_CARD, fg=COLOR_ACCENT).pack(anchor="w", padx=P)
-            tk.Label(self._fert_detail, text=f["note"], font=(FF, 9),
-                     bg=COLOR_CARD, fg=COLOR_TEXT_MUTED, wraplength=400,
-                     anchor="w", justify="left").pack(anchor="w", padx=P, pady=(4, P))
-
-    def _detail_section(self, parent, title, keys, fert):
-        FF = self.FF
-        P = DETAIL_PAD
-
-        # только элементы с ненулевым значением
-        active = [(ek, fert.get(ek, 0) or 0) for ek in keys if (fert.get(ek, 0) or 0) > 0]
-        if not active:
-            return
-
-        ttk.Separator(parent).pack(fill="x", padx=P, pady=10)
-        tk.Label(parent, text=title, font=(FF, 10, "bold"),
-                 bg=COLOR_CARD, fg=COLOR_ACCENT).pack(anchor="w", padx=P, pady=(0, SECTION_GAP))
-
-        for ek, val in active:
-            color = ELEMENT_COLORS.get(ek, COLOR_ACCENT)
-            ru = ELEMENT_RU.get(ek, ek)
-            formula = ELEMENT_FORMULA.get(ek, ek)
-
-            row = tk.Frame(parent, bg=COLOR_CARD)
-            row.pack(fill="x", padx=P, pady=ROW_GAP)
-
-            # цветной индикатор
-            ind = tk.Frame(row, bg=color, width=4, height=20)
-            ind.pack(side="left", padx=(0, 10))
-            ind.pack_propagate(False)
-            # название
-            tk.Label(row, text=f"{ru} ({formula})", bg=COLOR_CARD, fg=COLOR_TEXT,
-                     font=(FF, 10), width=18, anchor="w").pack(side="left")
-            # значение
-            tk.Label(row, text=f"{val:.2f} мг/мл", bg=COLOR_CARD, fg=COLOR_TEXT,
-                     font=(FF, 10, "bold"),
-                     width=14, anchor="w").pack(side="left")
-            # бар
-            bar_bg = tk.Frame(row, bg="#2a2015", height=10, width=160)
-            bar_bg.pack(side="left", padx=(12, 0))
-            bar_bg.pack_propagate(False)
-            max_in_group = max(v for _, v in active) or 1.0
-            bar_w = max(4, int(160 * (val / max_in_group)))
-            tk.Frame(bar_bg, bg=color, height=10, width=bar_w).place(x=0, y=0, relheight=1.0)
+        # активировать кнопки
+        self._fert_edit_btn.config(state="normal", bg=COLOR_ACCENT, fg="#151515")
+        self._fert_del_btn.config(state="normal")
 
     # ------------------------------------------------------------------
     # Обновление выпадающего списка на вкладке дозирования
@@ -352,7 +268,6 @@ class FertilizersTab:
         if data is not None:
             update_fertilizer(self.conn, fid, data)
             self.refresh_ferts()
-            self._show_fert_detail(fid)
 
     # ------------------------------------------------------------------
     # Удаление
@@ -371,12 +286,9 @@ class FertilizersTab:
             return
         delete_fertilizer(self.conn, fid)
         self._selected_fert_id = None
+        self._fert_edit_btn.config(state="disabled", bg=COLOR_ALT_ROW, fg=COLOR_TEXT_MUTED)
+        self._fert_del_btn.config(state="disabled")
         self.refresh_ferts()
-        # показываем пустую панель
-        for w in self._fert_detail.winfo_children():
-            w.destroy()
-        tk.Label(self._fert_detail, text="Выберите удобрение слева",
-                 bg=COLOR_CARD, fg=COLOR_TEXT_MUTED, font=(self.FF, 10)).pack(pady=40)
 
     # ------------------------------------------------------------------
     # Форма удобрения (модальный диалог)
@@ -384,7 +296,6 @@ class FertilizersTab:
 
     def _fertilizer_form_dialog(self, title, fert=None):
         FF = self.FF
-        is_edit = fert is not None
 
         dlg = tk.Toplevel(self.root if hasattr(self, "root") else self)
         dlg.title(title)
@@ -394,7 +305,7 @@ class FertilizersTab:
         dlg.resizable(False, False)
         dlg.geometry("580x700")
 
-        P = 20  # единый отступ внутри диалога
+        P = 20
 
         # --- название ---
         name_frame = tk.Frame(dlg, bg=COLOR_BG)
