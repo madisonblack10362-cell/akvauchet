@@ -565,12 +565,13 @@ class ReadingsTab:
         ]
 
         def history_fn(key):
-            rows = self.conn.execute(
-                "SELECT date, ? AS val FROM readings "
-                "WHERE aquarium_id=? AND ? IS NOT NULL "
-                "ORDER BY date ASC",
-                (key, aq_id, key),
-            ).fetchall()
+            # key — имя колонки (no3, po4, ...), подставляем напрямую
+            query = (
+                f"SELECT date, {key} AS val FROM readings "
+                f"WHERE aquarium_id=? AND {key} IS NOT NULL "
+                f"ORDER BY date ASC"
+            )
+            rows = self.conn.execute(query, (aq_id,)).fetchall()
             result = []
             for r in rows:
                 if days is not None:
