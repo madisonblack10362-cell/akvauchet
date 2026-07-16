@@ -355,12 +355,11 @@ def draw_daily_bars_chart(
         from aquarium_app.db import get_parameter_history
         history_fn = lambda key: get_parameter_history(conn, aq_id, key, days=days, since_iso=since_iso)
 
-    # ---- собираем данные ----
+    # ---- собираем данные (все элементы, даже без истории) ----
     elem_data = []
     for key, color, label in param_defs:
         hist = history_fn(key)
-        if len(hist) >= 1:
-            elem_data.append((key, color, label, hist))
+        elem_data.append((key, color, label, hist))
 
     if not elem_data:
         canvas.config(height=80)
@@ -378,10 +377,13 @@ def draw_daily_bars_chart(
             return raw
         return dt.date.fromisoformat(str(raw))
 
-    # ---- собираем сумму по дням ----
-    # day_totals: {date: [(key, color, label, val), ...]}
-    day_totals = {}
+    # ---- нарастающие значения по дням (carry forward) ----
+    # Для каждого элемента: строим ежедневные нарастающие суммы.
+    # Если в день элемент не вносился — значение = сумма с предыдущего дня.
+    # all_dates_sorted — все уникальные даты из всех элементов.
+    raw_daily = {}  # {key: {date: daily_dose}}
     for key, color, label, hist in elem_data:
+        d_map = {}
         for date_raw, v in hist:
             if not isinstance(v, (int, float)):
                 continue
@@ -389,9 +391,10 @@ def draw_daily_bars_chart(
                 d = _parse_date(date_raw)
             except Exception:
                 continue
-            day_totals.setdefault(d, []).append((key, color, label, v))
+            d_map[d] = v
+        raw_daily[key] = d_map
 
-    all_dates_sorted = sorted(day_totals.keys())
+    all_dates_sorted = sorted(set(d for dm in raw_daily.values() for d in dm))
     if not all_dates_sorted:
         canvas.config(height=80)
         canvas.delete("all")
@@ -401,6 +404,29 @@ def draw_daily_bars_chart(
                            fill=COLOR_TEXT_MUTED, font=(font_family, 8, "italic"))
         canvas._hover_points = []
         return
+
+    # Построить кумулятивные значения: для каждого элемента на каждый день
+    # cumulative[key][date] = нарастающая сумма (carry forward)
+    elem_key_info = {key: (color, label) for key, color, label, hist in elem_data}
+    elem_keys = list(raw_daily.keys())
+
+    cumulative = {}
+    for key in elem_keys:
+        running = 0.0
+        cum = {}
+        for d in all_dates_sorted:
+            running += raw_daily[key].get(d, 0.0)
+            cum[d] = running
+        cumulative[key] = cum
+
+    # day_totals: {date: [(key, color, label, cumulative_val), ...]}
+    day_totals = {}
+    for d in all_dates_sorted:
+        parts = []
+        for key in elem_keys:
+            color, label = elem_key_info[key]
+            parts.append((key, color, label, cumulative[key][d]))
+        day_totals[d] = parts
 
     # ---- максимум = максимальная сумма за день ----
     day_sums = {}
@@ -476,9 +502,9 @@ def draw_daily_bars_chart(
         bx1 = gx - bar_w / 2
         bx2 = gx + bar_w / 2
 
-        # рисуем сегменты снизу вверх
+        # рисуем сегменты снизу вверх (реверс: первый элемент — наверху)
         y_cursor = chart_bottom
-        for key, color, label, v in elems:
+        for key, color, label, v in reversed(elems):
             seg_h = (v / max_total) * chart_h
             seg_top = y_cursor - seg_h
 
@@ -511,13 +537,13 @@ def draw_daily_bars_chart(
                            text=d.strftime("%d.%m"),
                            fill=COLOR_TEXT_MUTED, font=(font_family, 7))
 
-    # ---- легенда ----
+    # ---- легенда (финальное нарастающее значение) ----
     legend_y = dates_y + dates_h + 2
     lx = pad_l
     for key, color, label, hist in elem_data:
-        vals = [v for _, v in hist if isinstance(v, (int, float))]
-        total = sum(vals)
-        txt = f"{label}  {fmt_axis(total)}"
+        # берём последнее кумулятивное значение элемента
+        last_cum = cumulative[key][all_dates_sorted[-1]] if all_dates_sorted else 0
+        txt = f"{label}  {fmt_axis(last_cum)}"
         canvas.create_rectangle(lx, legend_y - 4, lx + 10, legend_y + 4,
                                 fill=color, outline="")
         canvas.create_text(lx + 14, legend_y, anchor="w",
@@ -535,7 +561,7 @@ def draw_daily_bars_chart(
 
 
 def _on_bars_hover(canvas, event):
-    """Подсказка для stacked bar: дата + разбивка по элементам."""
+    """Подсказка для stacked bar: дата + нарастающие значения всех элементов + сумма."""
     if not canvas.winfo_exists():
         return
     points = getattr(canvas, "_hover_points", [])
@@ -565,9 +591,12 @@ def _on_bars_hover(canvas, event):
     if not breakdown:
         return
 
+    # breakdown уже содержит ВСЕ элементы с нарастающими значениями
     line_h = 15
-    box_h = line_h * (len(breakdown) + 1) + 10
-    text_w = 170  # фиксированная ширина, хватит для "NO3: 0.300 мг/л"
+    total = nearest.get("value", 0)
+    n_lines = len(breakdown) + 2  # элементы + дата + сумма
+    box_h = line_h * n_lines + 10
+    text_w = 190
     tx = nearest["x"] + 12
     if tx + text_w > w:
         tx = max(4, nearest["x"] - text_w - 12)
@@ -589,6 +618,13 @@ def _on_bars_hover(canvas, event):
         canvas.create_text(tx + 22, py + 6, anchor="w",
                             text=f"{label}:  {val:.3f} мг/л",
                             fill=color, font=(ff, 9, "bold"), tags="hover")
+    # общая сумма
+    sum_y = ty + 6 + line_h * (len(breakdown) + 1)
+    canvas.create_line(tx + 8, sum_y + 6, tx + text_w - 8, sum_y + 6,
+                        fill=COLOR_BORDER, tags="hover")
+    canvas.create_text(tx + 10, sum_y + 10, anchor="nw",
+                        text=f"Сумма: {total:.3f} мг/л",
+                        fill=COLOR_TEXT, font=(ff, 9, "bold"), tags="hover")
 
 
 # ---------------------------------------------------------------------------
