@@ -98,7 +98,6 @@ class FertilizersTab:
         self._fert_widgets = []  # [(card_frame, fert_id), ...]
         self._selected_fert_id = None
         self.fert_tree = None  # для совместимости с _refresh_fert_dropdown
-        self.after(100, self.refresh_ferts)
 
     # ------------------------------------------------------------------
     # Фильтрация по поиску
