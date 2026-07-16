@@ -462,10 +462,10 @@ class ProcessesTab:
 
         dlg.bind("<Escape>", lambda e: dlg.destroy())
         dlg.update_idletasks()
-        x = self.root.winfo_rootx() + 120
-        y = self.root.winfo_rooty() + 80
+        x = self.winfo_rootx() + 120
+        y = self.winfo_rooty() + 80
         dlg.geometry(f"+{x}+{y}")
-        self.root.wait_window(dlg)
+        self.wait_window(dlg)
 
     # ------------------------------------------------------------------
     # Периодическое обновление
@@ -478,4 +478,4 @@ class ProcessesTab:
                 self.refresh_processes()
         except tk.TclError:
             return
-        self.root.after(60000, self._proc_tick)
+        self.after(60000, self._proc_tick)

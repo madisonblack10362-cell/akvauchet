@@ -636,8 +636,8 @@ class TimersTab:
 
         dlg.bind("<Escape>", lambda e: dlg.destroy())
         dlg.update_idletasks()
-        x = self.root.winfo_rootx() + 120
-        y = self.root.winfo_rooty() + 80
+        x = self.winfo_rootx() + 120
+        y = self.winfo_rooty() + 80
         dlg.geometry(f"+{x}+{y}")
 
         # начальное состояние: показываем относительный, скрываем точный
@@ -645,7 +645,7 @@ class TimersTab:
         self._timer_relative_frame = relative_frame
         self._timer_exact_frame = exact_frame
 
-        self.root.wait_window(dlg)
+        self.wait_window(dlg)
 
     def _timer_mode_toggle(self, dlg, mode_var, relative_frame, exact_frame):
         if mode_var.get() == "relative":
@@ -662,7 +662,7 @@ class TimersTab:
     def _tick_timers(self):
         """Проверяет просроченные таймеры каждые 60 секунд."""
         self._check_due_timers()
-        self.root.after(60000, self._tick_timers)
+        self.after(60000, self._tick_timers)
 
     def _check_due_timers(self):
         """Показывает уведомления о просроченных невыполненных таймерах."""

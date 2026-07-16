@@ -73,9 +73,8 @@ class FertilizersTab:
         left.pack(side="left", fill="y", padx=(0, 6))
         left.pack_propagate(False)
 
-        # прокручиваемая область карточек
+        # прокручиваемая область карточек (скроллбар скрытый, только колесо)
         self._fert_cards_canvas = tk.Canvas(left, bg=COLOR_BG, highlightthickness=0)
-        cards_sb = ttk.Scrollbar(left, orient="vertical", command=self._fert_cards_canvas.yview)
         self._fert_cards_inner = tk.Frame(self._fert_cards_canvas, bg=COLOR_BG)
         self._fert_cards_inner.bind(
             "<Configure>",
@@ -83,8 +82,6 @@ class FertilizersTab:
                 scrollregion=self._fert_cards_canvas.bbox("all")),
         )
         self._fert_cards_canvas.create_window((0, 0), window=self._fert_cards_inner, anchor="nw")
-        self._fert_cards_canvas.configure(yscrollcommand=cards_sb.set)
-        cards_sb.pack(side="right", fill="y")
         self._fert_cards_canvas.pack(side="left", fill="both", expand=True)
         self._fert_cards_canvas.bind("<Enter>",
             lambda e: self._fert_cards_canvas.bind_all("<MouseWheel>", self._fert_cards_wheel))

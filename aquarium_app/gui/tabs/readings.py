@@ -476,10 +476,10 @@ class ReadingsTab:
 
         dlg.bind("<Escape>", lambda e: dlg.destroy())
         dlg.update_idletasks()
-        x = self.root.winfo_rootx() + 100
-        y = self.root.winfo_rooty() + 60
+        x = self.winfo_rootx() + 100
+        y = self.winfo_rooty() + 60
         dlg.geometry(f"+{x}+{y}")
-        self.root.wait_window(dlg)
+        self.wait_window(dlg)
 
     # ------------------------------------------------------------------
     # Удаление
