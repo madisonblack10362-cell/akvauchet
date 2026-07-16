@@ -328,7 +328,7 @@ def draw_param_trend_chart(
 
 
 # ---------------------------------------------------------------------------
-# draw_daily_bars_chart — группированные столбики по дням, единый масштаб
+# draw_daily_bars_chart — stacked bar: один столбик на день
 # ---------------------------------------------------------------------------
 
 def draw_daily_bars_chart(
@@ -339,25 +339,11 @@ def draw_daily_bars_chart(
     font_family="Segoe UI",
     empty_message="недостаточно данных для графика",
 ):
-    """Столбчатый график суточных доз с ЕДИНЫМ масштабом.
+    """Столбчатый график суточных доз — ОДИН стаканный столбик на день.
 
-    Все элементы рисуются на ОДНОЙ области с общей шкалой Y —
-    высота столбика прямо отражает реальное количество внесённого
-    элемента. У каждой даты — группировка столбиков по элементам.
-
-    Parameters
-    ----------
-    canvas : tk.Canvas
-    conn : sqlite3.Connection
-    aq_id : int
-    param_defs : list[tuple[str, str, str]]
-        Список (ключ, цвет, подпись).
-    days : int | None
-    since_iso : str | None
-    history_fn : callable | None
-        Функция (key) -> [(date_iso, value), ...].
-    font_family : str
-    empty_message : str
+    Высота столбика = сумма доз всех элементов за этот день.
+    Сегменты внутри столбика раскрашены по элементам.
+    При наведении — подсказка с разбивкой по каждому элементу.
     """
     if not canvas.winfo_exists():
         return
@@ -368,8 +354,8 @@ def draw_daily_bars_chart(
         from aquarium_app.db import get_parameter_history
         history_fn = lambda key: get_parameter_history(conn, aq_id, key, days=days, since_iso=since_iso)
 
-    # ---- собираем данные по всем элементам ----
-    elem_data = []  # [(key, color, label, [(date, val), ...])]
+    # ---- собираем данные ----
+    elem_data = []
     for key, color, label in param_defs:
         hist = history_fn(key)
         if len(hist) >= 1:
@@ -385,51 +371,63 @@ def draw_daily_bars_chart(
         canvas._hover_points = []
         return
 
-    n_elem = len(elem_data)
-
-    # ---- единый максимум по ВСЕМ элементам (правильные пропорции) ----
-    all_vals = []
-    for _k, _c, _l, hist in elem_data:
-        for _d, v in hist:
-            if isinstance(v, (int, float)):
-                all_vals.append(v)
-    global_max = max(all_vals) * 1.15 if all_vals else 1.0
-    if global_max == 0:
-        global_max = 1.0
-
-    # ---- календарная шкала X ----
-    # Безопасный парсинг дат: data может быть str или dt.date
+    # ---- безопасный парсинг дат ----
     def _parse_date(raw):
         if isinstance(raw, dt.date):
             return raw
         return dt.date.fromisoformat(str(raw))
 
-    all_dates_set = set()
-    for _k, _c, _l, hist in elem_data:
-        for date_raw, _v in hist:
+    # ---- собираем сумму по дням ----
+    # day_totals: {date: [(key, color, label, val), ...]}
+    day_totals = {}
+    for key, color, label, hist in elem_data:
+        for date_raw, v in hist:
+            if not isinstance(v, (int, float)):
+                continue
             try:
-                all_dates_set.add(_parse_date(date_raw))
+                d = _parse_date(date_raw)
             except Exception:
-                pass
-    all_dates_sorted = sorted(all_dates_set)  # list[dt.date]
+                continue
+            day_totals.setdefault(d, []).append((key, color, label, v))
+
+    all_dates_sorted = sorted(day_totals.keys())
+    if not all_dates_sorted:
+        canvas.config(height=80)
+        canvas.delete("all")
+        canvas.update_idletasks()
+        w = max(int(canvas.winfo_width()), 200)
+        canvas.create_text(w // 2, 40, text=empty_message,
+                           fill=COLOR_TEXT_MUTED, font=(font_family, 8, "italic"))
+        canvas._hover_points = []
+        return
+
+    # ---- максимум = максимальная сумма за день ----
+    day_sums = {}
+    for d, elems in day_totals.items():
+        day_sums[d] = sum(v for _, _, _, v in elems)
+    max_total = max(day_sums.values()) * 1.12 if day_sums else 1.0
+    if max_total == 0:
+        max_total = 1.0
+
+    # ---- период ----
     today = dt.date.today()
     if since_iso:
         try:
             period_start = _parse_date(since_iso)
         except Exception:
-            period_start = min(all_dates_sorted) if all_dates_sorted else today
+            period_start = min(all_dates_sorted)
     elif days is not None:
         period_start = today - dt.timedelta(days=days)
     else:
-        period_start = min(all_dates_sorted) if all_dates_sorted else today
-    period_end = max(all_dates_sorted + [today]) if all_dates_sorted else today
+        period_start = min(all_dates_sorted)
+    period_end = max(all_dates_sorted + [today])
     span_days = max((period_end - period_start).days, 1)
 
-    # ---- размеры canvas ----
+    # ---- размеры ----
     chart_h = 230
-    legend_h = 20
+    legend_h = 18
     dates_h = 16
-    pad_l, pad_r, pad_t, pad_b = 46, 14, 8, 6
+    pad_l, pad_r, pad_t, pad_b = 46, 14, 10, 6
     h = pad_t + chart_h + dates_h + legend_h + pad_b
     canvas.config(height=h)
 
@@ -437,27 +435,24 @@ def draw_daily_bars_chart(
     canvas.update_idletasks()
     w = max(int(canvas.winfo_width()), 200)
     plot_w = w - pad_l - pad_r
+    chart_bottom = pad_t + chart_h
 
     def x_for_date(d):
         offset = max(0, min((d - period_start).days, span_days))
         return pad_l + plot_w * offset / span_days
 
-    # ---- область графика ----
-    chart_top = pad_t
-    chart_bottom = pad_t + chart_h
+    def y_for_val(val):
+        return chart_bottom - (val / max_total) * chart_h
 
-    # ---- единица измерения сверху ----
-    canvas.create_text(pad_l + plot_w, chart_top - 1, anchor="ne",
+    # ---- единица измерения ----
+    canvas.create_text(pad_l + plot_w, pad_t - 2, anchor="ne",
                        text="мг/л", fill="#3a3d48", font=(font_family, 7))
 
-    # ---- сетка (только 0, 0.5, 1.0 доли) ----
-    grid_fracs = [0.0, 0.5, 1.0]
-    # добавляем промежуточные если максимум большой
-    if global_max > 0.5:
-        grid_fracs = [0.0, 0.25, 0.5, 0.75, 1.0]
-    for frac in grid_fracs:
-        y = chart_bottom - chart_h * frac
-        val = global_max * frac
+    # ---- сетка ----
+    nice_steps = [0.0, 0.25, 0.5, 0.75, 1.0]
+    for frac in nice_steps:
+        y = y_for_val(max_total * frac)
+        val = max_total * frac
         is_zero = (frac == 0.0)
         canvas.create_line(pad_l, y, pad_l + plot_w, y,
                             fill="#2c2f3a" if is_zero else "#181a22",
@@ -467,115 +462,143 @@ def draw_daily_bars_chart(
                            fill=COLOR_TEXT_MUTED if is_zero else "#2e313b",
                            font=(font_family, 7))
 
-    # ---- рисуем столбики ----
+    # ---- ширина столбиков ----
     n_dates = len(all_dates_sorted)
-    # адаптивная ширина: чем больше дат — тем тоньше, но не менее 4px
-    max_group = plot_w / max(n_dates, 1) * 0.82
-    group_w = max(n_elem * 5, min(max_group, 70))
-    bar_gap = 2  # зазор между столбиками в группе
-    bar_w = max(4, (group_w - (n_elem - 1) * bar_gap) / n_elem)
-    # пересчитываем реальную ширину группы
-    total_bar_w = n_elem * bar_w + (n_elem - 1) * bar_gap
-    min_bar_h = 4
+    bar_w = max(12, min(40, plot_w / max(n_dates, 1) * 0.55))
 
     hover_points = []
 
     for d in all_dates_sorted:
-        d_iso = d.isoformat()
+        elems = day_totals[d]
+        total = day_sums[d]
         gx = x_for_date(d)
+        bx1 = gx - bar_w / 2
+        bx2 = gx + bar_w / 2
 
-        # собираем значения для этой даты по всем элементам
-        day_vals = {}
-        for key, color, label, hist in elem_data:
-            for di, vi in hist:
-                di_str = di.isoformat() if isinstance(di, dt.date) else str(di)
-                if di_str == d_iso and isinstance(vi, (int, float)):
-                    day_vals[key] = vi
-                    break
+        # рисуем сегменты снизу вверх
+        y_cursor = chart_bottom
+        for key, color, label, v in elems:
+            seg_h = (v / max_total) * chart_h
+            seg_top = y_cursor - seg_h
 
-        if not day_vals:
-            continue
-
-        group_left = gx - total_bar_w / 2
-
-        for ei, (key, color, label, hist) in enumerate(elem_data):
-            v = day_vals.get(key)
-            if v is None:
-                continue
-
-            bx = group_left + ei * (bar_w + bar_gap)
-            frac = v / global_max
-            bar_h = max(min_bar_h, chart_h * frac)
-            bar_top = chart_bottom - bar_h
-
-            # основной столбик (с градиентом: низ темнее, верх светлее)
-            canvas.create_rectangle(bx, bar_top, bx + bar_w, chart_bottom,
-                                    fill=_darken(color, 0.15), outline="")
-            # верхняя половина — основной цвет
-            mid_y = bar_top + bar_h * 0.4
-            canvas.create_rectangle(bx, bar_top, bx + bar_w, mid_y,
+            # сегмент
+            canvas.create_rectangle(bx1, seg_top, bx2, y_cursor,
                                     fill=color, outline="")
-            # блик сверху
-            cap_h = min(4, bar_h * 0.3)
-            if cap_h >= 1:
-                canvas.create_rectangle(bx + 1, bar_top, bx + bar_w - 1, bar_top + cap_h,
-                                        fill=_lighten(color, 0.4), outline="")
+            # тёмная линия-разделитель сверху сегмента
+            if seg_h > 2:
+                canvas.create_line(bx1, seg_top, bx2, seg_top,
+                                    fill=_darken(color, 0.3), width=1)
+            # блик слева
+            if seg_h > 4:
+                canvas.create_rectangle(bx1, seg_top, bx1 + 3, y_cursor,
+                                        fill=_lighten(color, 0.2), outline="")
 
-            # подпись значения — только над высокими столбиками
-            val_str = fmt_axis(v)
-            if bar_h > 20:
-                canvas.create_text(bx + bar_w / 2, bar_top + 5, anchor="n",
-                                   text=val_str, fill="#d0d0d0",
-                                   font=(font_family, 7, "bold"))
+            y_cursor = seg_top
 
-            hover_points.append({"x": bx + bar_w / 2, "y": bar_top,
-                                  "date": d_iso, "value": v,
-                                  "label": label, "color": color})
+        # подпись суммы над столбиком
+        if total > 0:
+            top_y = y_for_val(total)
+            canvas.create_text(gx, top_y - 5, anchor="s",
+                               text=fmt_axis(total),
+                               fill="#c0c0c0", font=(font_family, 7, "bold"))
 
-    # ---- ось X (даты) ----
+        # hover — одна точка на столбик, но с полной разбивкой
+        hover_points.append({
+            "x": gx, "y": y_for_val(total),
+            "date": d.isoformat(), "value": total,
+            "label": "сумма", "color": "#ffffff",
+            "_breakdown": elems,  # скрытые данные для подсказки
+        })
+
+    # ---- ось X: даты под столбиками ----
     dates_y = chart_bottom + 4
-    # рисуем дату под каждой группой столбиков
     for d in all_dates_sorted:
         dx = x_for_date(d)
         canvas.create_text(dx, dates_y, anchor="n",
                            text=d.strftime("%d.%m"),
-                           fill="#3a3d48", font=(font_family, 7))
-    # крайние даты контрастнее
-    if all_dates_sorted:
-        d_first, d_last = all_dates_sorted[0], all_dates_sorted[-1]
-        dx_first = x_for_date(d_first)
-        dx_last = x_for_date(d_last)
-        canvas.create_text(dx_first, dates_y, anchor="n",
-                           text=d_first.strftime("%d.%m"),
-                           fill=COLOR_TEXT_MUTED, font=(font_family, 7))
-        canvas.create_text(dx_last, dates_y, anchor="n",
-                           text=d_last.strftime("%d.%m"),
                            fill=COLOR_TEXT_MUTED, font=(font_family, 7))
 
-    # ---- легенда внизу ----
+    # ---- легенда ----
     legend_y = dates_y + dates_h + 2
     lx = pad_l
     for key, color, label, hist in elem_data:
         vals = [v for _, v in hist if isinstance(v, (int, float))]
         total = sum(vals)
-        txt = f"{label} {fmt_axis(total)}"
-        # цветной кружок
-        canvas.create_oval(lx, legend_y - 4, lx + 8, legend_y + 4,
-                           fill=color, outline="")
-        canvas.create_text(lx + 12, legend_y, anchor="w",
+        txt = f"{label}  {fmt_axis(total)}"
+        canvas.create_rectangle(lx, legend_y - 4, lx + 10, legend_y + 4,
+                                fill=color, outline="")
+        canvas.create_text(lx + 14, legend_y, anchor="w",
                            text=txt, fill=COLOR_TEXT_SOFT,
                            font=(font_family, 8))
-        # примерная ширина текста
-        lx += 16 + len(txt) * 5 + 14
+        lx += 18 + len(txt) * 5 + 12
 
     # ---- hover ----
     canvas._hover_points = hover_points
     canvas._hover_h = h
     canvas._hover_w = w
     if not getattr(canvas, "_hover_bound", False):
-        canvas.bind("<Motion>", lambda e, c=canvas: on_chart_hover(c, e))
+        canvas.bind("<Motion>", lambda e, c=canvas: _on_bars_hover(c, e))
         canvas.bind("<Leave>", lambda e, c=canvas: on_chart_leave(c))
         canvas._hover_bound = True
+
+
+def _on_bars_hover(canvas, event):
+    """Подсказка для stacked bar: дата + разбивка по элементам."""
+    if not canvas.winfo_exists():
+        return
+    points = getattr(canvas, "_hover_points", [])
+    canvas.delete("hover")
+    if not points:
+        return
+    nearest = min(points, key=lambda p: abs(p["x"] - event.x))
+    if abs(nearest["x"] - event.x) > 30:
+        return
+
+    h = getattr(canvas, "_hover_h", 80)
+    w = getattr(canvas, "_hover_w", 200)
+    ff = _get_chart_font(canvas)
+
+    # вертикальная линия
+    canvas.create_line(nearest["x"], 0, nearest["x"], h,
+                        fill="#3a3f4d", dash=(2, 2), tags="hover")
+
+    # построим подсказку
+    raw_date = nearest["date"]
+    if isinstance(raw_date, dt.date):
+        date_str = raw_date.strftime("%d.%m.%Y")
+    else:
+        date_str = from_iso(raw_date)
+
+    breakdown = nearest.get("_breakdown", [])
+    lines = [f'{lbl}: {v:.3f}' for _, _, lbl, v in breakdown]
+    if not lines:
+        lines = [f'{nearest["label"]}: {nearest["value"]:.3f}']
+
+    line_h = 14
+    box_h = line_h * (len(lines) + 1) + 8
+    text_w = max(8 * len(t) for t in [date_str] + lines) + 18
+    tx = nearest["x"] + 10
+    if tx + text_w > w:
+        tx = max(4, nearest["x"] - text_w - 10)
+    ty = 4
+    if ty + box_h > h:
+        ty = max(4, h - box_h - 4)
+
+    # фон
+    canvas.create_rectangle(tx, ty, tx + text_w, ty + box_h,
+                             fill="#0a0b10", outline=COLOR_BORDER, tags="hover")
+    # дата
+    canvas.create_text(tx + 8, ty + 6, anchor="nw", text=date_str,
+                        fill=COLOR_TEXT_MUTED, font=(ff, 8), tags="hover")
+    # элементы
+    for i, (key, color, label, val) in enumerate(breakdown):
+        # цветная точка
+        py = ty + 6 + line_h * (i + 1)
+        canvas.create_oval(tx + 8, py + 2, tx + 14, py + 8,
+                            fill=color, outline="", tags="hover")
+        canvas.create_text(tx + 18, py + 5, anchor="w",
+                            text=f"{label}: {val:.3f} мг/л",
+                            fill=color, font=(ff, 8, "bold"), tags="hover")
 
 
 # ---------------------------------------------------------------------------
