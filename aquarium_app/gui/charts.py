@@ -138,6 +138,7 @@ def draw_param_trend_chart(
     history_fn=None,
     font_family="Segoe UI",
     empty_message="недостаточно данных для графика",
+    target_ranges=None,
 ):
     """Обобщённая отрисовка графика динамики нескольких параметров.
 
@@ -161,6 +162,9 @@ def draw_param_trend_chart(
     font_family : str
     empty_message : str
         Текст, показываемый при недостатке данных.
+    target_ranges : dict | None
+        Словарь {key: (min, max)} с целевыми диапазонами.
+        Если передан, на график рисуется полупрозрачная полоса целевого диапазона.
     """
     if not canvas.winfo_exists():
         return
@@ -243,6 +247,23 @@ def draw_param_trend_chart(
             canvas.create_line(pad_l, y, pad_l + plot_w, y, fill="#2c2f3a", width=1)
             canvas.create_text(pad_l - 4, y, anchor="e", text=fmt_axis(val),
                                fill=COLOR_TEXT_MUTED, font=(font_family, 7))
+
+        # целевой диапазон (зелёная полоса)
+        if target_ranges and key in target_ranges:
+            t_min, t_max = target_ranges[key]
+            if t_min is not None and t_max is not None and t_max > t_min:
+                range_span = local_max - local_min
+                if range_span > 0:
+                    y_hi = strip_bottom - strip_h * ((t_max - local_min) / range_span)
+                    y_lo = strip_bottom - strip_h * ((t_min - local_min) / range_span)
+                    y_hi = max(strip_top, min(strip_bottom, y_hi))
+                    y_lo = max(strip_top, min(strip_bottom, y_lo))
+                    canvas.create_rectangle(pad_l, y_hi, pad_l + plot_w, y_lo,
+                                             fill="#0d2818", outline="")
+                    canvas.create_line(pad_l, y_hi, pad_l + plot_w, y_hi,
+                                     fill="#1a4a2e", width=1, dash=(3, 3))
+                    canvas.create_line(pad_l, y_lo, pad_l + plot_w, y_lo,
+                                     fill="#1a4a2e", width=1, dash=(3, 3))
 
         points = []
         for date_iso, v in hist:
