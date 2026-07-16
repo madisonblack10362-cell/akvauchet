@@ -495,19 +495,11 @@ def draw_daily_bars_chart(
 
             y_cursor = seg_top
 
-        # подпись суммы над столбиком
-        if total > 0:
-            top_y = y_for_val(total)
-            canvas.create_text(gx, top_y - 5, anchor="s",
-                               text=fmt_axis(total),
-                               fill="#c0c0c0", font=(font_family, 7, "bold"))
-
-        # hover — одна точка на столбик, но с полной разбивкой
+        # hover — точка на вершине столбика с разбивкой
         hover_points.append({
             "x": gx, "y": y_for_val(total),
             "date": d.isoformat(), "value": total,
-            "label": "сумма", "color": "#ffffff",
-            "_breakdown": elems,  # скрытые данные для подсказки
+            "_breakdown": elems,
         })
 
     # ---- ось X: даты под столбиками ----
@@ -570,16 +562,15 @@ def _on_bars_hover(canvas, event):
         date_str = from_iso(raw_date)
 
     breakdown = nearest.get("_breakdown", [])
-    lines = [f'{lbl}: {v:.3f}' for _, _, lbl, v in breakdown]
-    if not lines:
-        lines = [f'{nearest["label"]}: {nearest["value"]:.3f}']
+    if not breakdown:
+        return
 
-    line_h = 14
-    box_h = line_h * (len(lines) + 1) + 8
-    text_w = max(8 * len(t) for t in [date_str] + lines) + 18
-    tx = nearest["x"] + 10
+    line_h = 15
+    box_h = line_h * (len(breakdown) + 1) + 10
+    text_w = 170  # фиксированная ширина, хватит для "NO3: 0.300 мг/л"
+    tx = nearest["x"] + 12
     if tx + text_w > w:
-        tx = max(4, nearest["x"] - text_w - 10)
+        tx = max(4, nearest["x"] - text_w - 12)
     ty = 4
     if ty + box_h > h:
         ty = max(4, h - box_h - 4)
@@ -588,17 +579,16 @@ def _on_bars_hover(canvas, event):
     canvas.create_rectangle(tx, ty, tx + text_w, ty + box_h,
                              fill="#0a0b10", outline=COLOR_BORDER, tags="hover")
     # дата
-    canvas.create_text(tx + 8, ty + 6, anchor="nw", text=date_str,
-                        fill=COLOR_TEXT_MUTED, font=(ff, 8), tags="hover")
-    # элементы
+    canvas.create_text(tx + 10, ty + 6, anchor="nw", text=date_str,
+                        fill=COLOR_TEXT_MUTED, font=(ff, 9), tags="hover")
+    # элементы — каждый со своей цветной точкой
     for i, (key, color, label, val) in enumerate(breakdown):
-        # цветная точка
         py = ty + 6 + line_h * (i + 1)
-        canvas.create_oval(tx + 8, py + 2, tx + 14, py + 8,
+        canvas.create_oval(tx + 10, py + 2, tx + 18, py + 10,
                             fill=color, outline="", tags="hover")
-        canvas.create_text(tx + 18, py + 5, anchor="w",
-                            text=f"{label}: {val:.3f} мг/л",
-                            fill=color, font=(ff, 8, "bold"), tags="hover")
+        canvas.create_text(tx + 22, py + 6, anchor="w",
+                            text=f"{label}:  {val:.3f} мг/л",
+                            fill=color, font=(ff, 9, "bold"), tags="hover")
 
 
 # ---------------------------------------------------------------------------
