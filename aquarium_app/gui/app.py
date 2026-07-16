@@ -120,14 +120,14 @@ class App(
             f.place(relx=0, rely=0, relwidth=1, relheight=1)
 
         # Строим все вкладки
-        self._build_dashboard_tab()
-        self._build_journal_tab()
-        self._build_aquariums_tab()
-        self._build_ferts_tab()
-        self._build_dosing_tab()
-        self._build_readings_tab()
-        self._build_timers_tab()
-        self._build_processes_tab()
+        self.build_dashboard_tab()
+        self.build_journal_tab()
+        self.build_aquariums_tab()
+        self.build_ferts_tab()
+        self.build_dosing_tab()
+        self.build_readings_tab()
+        self.build_timers_tab()
+        self.build_processes_tab()
 
         # Навигация
         self._nav_items = [
