@@ -321,10 +321,9 @@ def draw_param_trend_chart(
     canvas._hover_points = hover_points
     canvas._hover_h = h
     canvas._hover_w = w
-    if not getattr(canvas, "_hover_bound", False):
-        canvas.bind("<Motion>", lambda e, c=canvas: on_chart_hover(c, e))
-        canvas.bind("<Leave>", lambda e, c=canvas: on_chart_leave(c))
-        canvas._hover_bound = True
+    canvas._hover_type = "trend"
+    canvas.bind("<Motion>", lambda e, c=canvas: on_chart_hover(c, e))
+    canvas.bind("<Leave>", lambda e, c=canvas: on_chart_leave(c))
 
 
 # ---------------------------------------------------------------------------
@@ -528,10 +527,9 @@ def draw_daily_bars_chart(
     canvas._hover_points = hover_points
     canvas._hover_h = h
     canvas._hover_w = w
-    if not getattr(canvas, "_hover_bound", False):
-        canvas.bind("<Motion>", lambda e, c=canvas: _on_bars_hover(c, e))
-        canvas.bind("<Leave>", lambda e, c=canvas: on_chart_leave(c))
-        canvas._hover_bound = True
+    canvas._hover_type = "bars"
+    canvas.bind("<Motion>", lambda e, c=canvas: _on_bars_hover(c, e))
+    canvas.bind("<Leave>", lambda e, c=canvas: on_chart_leave(c))
 
 
 def _on_bars_hover(canvas, event):
