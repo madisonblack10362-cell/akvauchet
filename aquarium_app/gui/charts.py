@@ -311,8 +311,18 @@ def draw_param_trend_chart(
 
 
 # ---------------------------------------------------------------------------
-# draw_daily_bars_chart — столбчатый график суточных доз
+# draw_daily_bars_chart — столбчатый график суточных доз (переработанный)
 # ---------------------------------------------------------------------------
+
+def _lighten(hex_color, factor=0.25):
+    """Осветляет hex-цвет на factor (0–1), возвращая новый hex."""
+    hex_color = hex_color.lstrip("#")
+    r, g, b = int(hex_color[:2], 16), int(hex_color[2:4], 16), int(hex_color[4:], 16)
+    r = min(255, int(r + (255 - r) * factor))
+    g = min(255, int(g + (255 - g) * factor))
+    b = min(255, int(b + (255 - b) * factor))
+    return f"#{r:02x}{g:02x}{b:02x}"
+
 
 def draw_daily_bars_chart(
     canvas, conn, aq_id,
@@ -323,30 +333,17 @@ def draw_daily_bars_chart(
     empty_message="недостаточно данных для графика",
 ):
     """Столбчатый график: сколько элемента внесено В КАЖДЫЙ КОНКРЕТНЫЙ день
-    (без накопления). Дни без внесений просто остаются пустыми.
+    (без накопления). Дни без внесений остаются пустыми.
 
-    Оформление специально сделано менее «шумным», чем у линейного графика:
-    одна подпись максимума на полосу, мягкая чередующаяся заливка фона,
-    высота canvas подстраивается под количество элементов.
-
-    Parameters
-    ----------
-    canvas : tk.Canvas
-    conn : sqlite3.Connection
-    aq_id : int
-    param_defs : list[tuple[str, str, str]]
-        Список (ключ, цвет, подпись).
-    days : int | None
-    since_iso : str | None
-    history_fn : callable | None
-        Функция (key) -> [(date_iso, value), ...].
-    font_family : str
-    empty_message : str
+    Каждый элемент рисуется в своей полосе с собственным масштабом
+    (иначе микроэлементы вроде Fe были бы невидимы рядом с NO3).
+    ВНИМАНИЕ: на каждом столбике подписано АБСОЛЮТНОЕ значение в мг/л,
+    а справа от полосы — сумма за период — это позволяет корректно
+    сравнивать элементы между собой несмотря на разный визуальный масштаб.
     """
     if not canvas.winfo_exists():
         return
 
-    # сохраняем шрифт для hover-подсказок
     canvas._chart_font_family = font_family
 
     if history_fn is None:
@@ -369,11 +366,11 @@ def draw_daily_bars_chart(
         canvas._hover_points = []
         return
 
-    # высота полосы подстраивается под число элементов
+    # ---- размеры ----
     n_strips = len(strips)
-    strip_h = 42
-    gap = 16
-    pad_l, pad_r, pad_t, pad_b = 34, 40, 14, 24
+    strip_h = 56          # выше, чтобы влезли подписи на столбиках
+    gap = 6
+    pad_l, pad_r, pad_t, pad_b = 38, 62, 10, 22
     content_h = n_strips * strip_h + (n_strips - 1) * gap
     h = pad_t + content_h + pad_b
     canvas.config(height=h)
@@ -383,7 +380,7 @@ def draw_daily_bars_chart(
     w = max(int(canvas.winfo_width()), 200)
     plot_w = w - pad_l - pad_r
 
-    # общая календарная шкала X
+    # ---- общая календарная шкала X ----
     all_dates = []
     for _key, _color, _label, hist in strips:
         for date_iso, _v in hist:
@@ -412,9 +409,10 @@ def draw_daily_bars_chart(
         offset = max(0, min((d - period_start).days, span_days))
         return pad_l + plot_w * offset / span_days
 
-    # ширина одного столбика
-    bar_w = max(3, min(12, plot_w / max(span_days, 1) * 0.6))
-    min_bar_h = 3
+    # ширина столбика — адаптивная
+    bar_w = max(4, min(18, plot_w / max(span_days, 1) * 0.55))
+    min_bar_h = 4
+    label_area_h = 13  # зарезервировано сверху полосы под подписи
 
     hover_points = []
 
@@ -422,49 +420,102 @@ def draw_daily_bars_chart(
         strip_top = pad_t + idx * (strip_h + gap)
         strip_bottom = strip_top + strip_h
 
-        # мягкая чередующаяся заливка фона
-        if idx % 2 == 0:
-            canvas.create_rectangle(0, strip_top - gap / 2, w, strip_bottom + gap / 2,
-                                    fill="#14161f", outline="")
+        # фон полосы
+        bg = "#181a22" if idx % 2 == 0 else COLOR_CARD
+        canvas.create_rectangle(0, strip_top, w, strip_bottom, fill=bg, outline="")
 
         vals = [v for _, v in hist if isinstance(v, (int, float))]
-        local_max = max(vals) * 1.15 if vals else 1.0
+        local_max = max(vals) * 1.2 if vals else 1.0
         if local_max == 0:
             local_max = 1.0
 
-        # линия-основание (0) и подпись максимума
-        canvas.create_line(pad_l, strip_bottom, pad_l + plot_w, strip_bottom,
-                            fill="#2c2f3a", width=1)
-        canvas.create_text(pad_l - 4, strip_top, anchor="ne", text=fmt_axis(local_max),
-                           fill=COLOR_TEXT_MUTED, font=(font_family, 7))
+        # область отрисовки столбиков (под подписями)
+        bars_top = strip_top + label_area_h
+        bars_bottom = strip_bottom
+        bars_h = bars_bottom - bars_top
 
+        # линия-основание (0)
+        canvas.create_line(pad_l, bars_bottom, pad_l + plot_w, bars_bottom,
+                            fill="#2c2f3a", width=1)
+        # лёгкая горизонтальная линия на 50%
+        mid_y = bars_top + bars_h * 0.5
+        canvas.create_line(pad_l, mid_y, pad_l + plot_w, mid_y,
+                            fill="#1e2028", width=1)
+
+        # подписи шкалы Y (максимум и 0)
+        canvas.create_text(pad_l - 4, bars_top, anchor="ne",
+                           text=fmt_axis(local_max),
+                           fill=COLOR_TEXT_MUTED, font=(font_family, 7))
+        canvas.create_text(pad_l - 4, bars_bottom, anchor="se",
+                           text="0", fill="#3a3d48", font=(font_family, 7))
+
+        color_light = _lighten(color, 0.3)
+
+        # ---- столбики ----
         for date_iso, v in hist:
             x = x_for_date(date_iso)
             frac = v / local_max
-            bar_h = max(min_bar_h, strip_h * frac)
-            bar_top = strip_bottom - bar_h
-            canvas.create_rectangle(x - bar_w / 2, bar_top, x + bar_w / 2, strip_bottom,
+            bar_h = max(min_bar_h, bars_h * frac)
+            bar_top = bars_bottom - bar_h
+
+            # основной прямоугольник
+            canvas.create_rectangle(x - bar_w / 2, bar_top,
+                                    x + bar_w / 2, bars_bottom,
                                     fill=color, outline="")
-            hover_points.append({"x": x, "y": bar_top, "date": date_iso, "value": v,
+
+            # верхняя «шапка» чуть светлее — эффект объема
+            cap_h = min(3, bar_h)
+            if cap_h >= 2:
+                canvas.create_rectangle(x - bar_w / 2, bar_top,
+                                        x + bar_w / 2, bar_top + cap_h,
+                                        fill=color_light, outline="")
+
+            # подпись значения НАД столбиком
+            val_text = fmt_axis(v)
+            # если столбиков мало — подпись сверху, иначе можно внутри
+            canvas.create_text(x, bar_top - 3, anchor="s",
+                               text=val_text, fill=color_light,
+                               font=(font_family, 7, "bold"))
+
+            hover_points.append({"x": x, "y": bar_top,
+                                  "date": date_iso, "value": v,
                                   "label": label, "color": color})
 
-        # подпись элемента справа
-        label_x = min(pad_l + plot_w + 10, w - 30)
-        dot_y = strip_top + strip_h / 2
-        canvas.create_oval(label_x, dot_y - 3, label_x + 6, dot_y + 3, fill=color, outline="")
-        canvas.create_text(label_x + 10, dot_y, anchor="w", text=label,
-                           fill=color, font=(font_family, 8, "bold"))
+        # ---- подпись элемента + сумма справа ----
+        total = sum(vals)
+        label_x = pad_l + plot_w + 6
+        mid_strip_y = strip_top + strip_h / 2
 
-    axis_y = h - 4
-    canvas.create_text(pad_l, axis_y, anchor="sw", text=period_start.strftime("%d.%m"),
+        # цветная точка-маркер
+        canvas.create_oval(label_x, mid_strip_y - 4, label_x + 8, mid_strip_y + 4,
+                            fill=color, outline="")
+        # название элемента
+        canvas.create_text(label_x + 12, mid_strip_y - 8, anchor="w",
+                           text=label, fill=color,
+                           font=(font_family, 9, "bold"))
+        # сумма за период
+        canvas.create_text(label_x + 12, mid_strip_y + 7, anchor="w",
+                           text=f"∑ {fmt_axis(total)} мг/л",
+                           fill=COLOR_TEXT_MUTED,
+                           font=(font_family, 7))
+
+    # ---- ось X: даты ----
+    axis_y = h - 3
+    canvas.create_text(pad_l, axis_y, anchor="sw",
+                       text=period_start.strftime("%d.%m"),
                        fill=COLOR_TEXT_MUTED, font=(font_family, 7))
-    canvas.create_text(pad_l + plot_w, axis_y, anchor="se", text=period_end.strftime("%d.%m"),
+    canvas.create_text(pad_l + plot_w, axis_y, anchor="se",
+                       text=period_end.strftime("%d.%m"),
                        fill=COLOR_TEXT_MUTED, font=(font_family, 7))
-    if span_days > 3:
-        mid_date = period_start + dt.timedelta(days=span_days // 2)
-        mid_x = x_for_date(mid_date.isoformat())
-        canvas.create_text(mid_x, axis_y, anchor="s", text=mid_date.strftime("%d.%m"),
-                           fill=COLOR_TEXT_MUTED, font=(font_family, 7))
+    if span_days > 5:
+        step = max(1, span_days // 4)
+        d = period_start + dt.timedelta(days=step)
+        while d < period_end:
+            dx = x_for_date(d.isoformat())
+            canvas.create_text(dx, axis_y, anchor="s",
+                               text=d.strftime("%d.%m"),
+                               fill="#3a3d48", font=(font_family, 7))
+            d += dt.timedelta(days=step)
 
     canvas._hover_points = hover_points
     canvas._hover_h = h
