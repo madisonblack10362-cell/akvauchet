@@ -192,8 +192,8 @@ class DashboardTab:
                 tk.Label(row, text=txt, font=(FF, 9), bg=COLOR_CARD, fg=clr,
                          anchor="w", wraplength=500, justify="left").pack(anchor="w")
 
-        # --- индикатор подмены воды (30 дней) ---
-        wc_stats = get_water_change_stats(self.conn, aq_id, days=30)
+        # --- индикатор подмены воды (за неделю) ---
+        wc_stats = get_water_change_stats(self.conn, aq_id, days=7)
         wc_frame = tk.Frame(card, bg=COLOR_ACCENT_SOFT, highlightbackground=COLOR_ACCENT,
                             highlightthickness=1)
         wc_frame.pack(fill="x", pady=(8, 0))
@@ -207,24 +207,35 @@ class DashboardTab:
 
         if wc_stats["count"] > 0:
             wc_body = tk.Frame(wc_frame, bg=COLOR_ACCENT_SOFT)
-            wc_body.pack(fill="x", padx=10, pady=(0, 8))
+            wc_body.pack(fill="x", padx=10, pady=(0, 4))
 
-            # сколько раз
-            tk.Label(wc_body, text=f"{wc_stats['count']} раз за 30 дн",
-                     font=(FF, 10, "bold"), bg=COLOR_ACCENT_SOFT,
+            # последняя подмена — главное число
+            if wc_stats["last_pct"] is not None:
+                last_txt = f"Последняя: {wc_stats['last_pct']:.1f}%"
+            elif wc_stats["last_l"] is not None:
+                last_txt = f"Последняя: {wc_stats['last_l']:g} л"
+            else:
+                last_txt = ""
+            tk.Label(wc_body, text=last_txt,
+                     font=(FF, 11, "bold"), bg=COLOR_ACCENT_SOFT,
                      fg=COLOR_TEXT).pack(side="left")
 
-            if wc_stats["total_pct"] > 0:
-                tk.Label(wc_body, text=f"  |  {wc_stats['total_pct']:.0f}% объёма за 30 дн",
+            if wc_stats["last_date"]:
+                tk.Label(wc_body, text=f"  {from_iso(wc_stats['last_date'])}",
                          font=(FF, 10), bg=COLOR_ACCENT_SOFT,
                          fg=COLOR_TEXT_MUTED).pack(side="left")
 
-            if wc_stats["last_date"]:
-                tk.Label(wc_body, text=f"  |  последняя: {from_iso(wc_stats['last_date'])}",
-                         font=(FF, 9), bg=COLOR_ACCENT_SOFT,
-                         fg=COLOR_TEXT_MUTED).pack(side="left")
+            # итог за неделю
+            wc_summary = tk.Frame(wc_frame, bg=COLOR_ACCENT_SOFT)
+            wc_summary.pack(fill="x", padx=10, pady=(0, 8))
+            parts = [f"{wc_stats['count']} раз за 7 дн"]
+            if wc_stats["total_pct"] > 0:
+                parts.append(f"итого {wc_stats['total_pct']:.0f}% объёма")
+            tk.Label(wc_summary, text="  |  ".join(parts),
+                     font=(FF, 9), bg=COLOR_ACCENT_SOFT,
+                     fg=COLOR_TEXT_MUTED).pack(anchor="w")
 
-            # индикатор достаточности подмен
+            # индикатор достаточности
             if wc_stats["total_pct"] < 30:
                 wc_tip = "  ⚠ Мало подмен — рекомендуется от 30% в неделю"
                 tip_clr = COLOR_WARN_TEXT
@@ -240,6 +251,6 @@ class DashboardTab:
                 tk.Label(tip_row, text=wc_tip, font=(FF, 9),
                          bg=COLOR_ACCENT_SOFT, fg=tip_clr).pack(anchor="w")
         else:
-            tk.Label(wc_frame, text="  Подмен не было 30 дней — пора!",
+            tk.Label(wc_frame, text="  Подмен не было неделю — пора!",
                      font=(FF, 10), bg=COLOR_ACCENT_SOFT,
                      fg=COLOR_WARN_TEXT).pack(anchor="w", padx=10, pady=(0, 8))
