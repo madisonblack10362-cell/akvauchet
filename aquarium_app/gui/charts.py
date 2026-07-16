@@ -649,7 +649,8 @@ def _on_bars_hover(canvas, event):
 
 def on_chart_hover(canvas, event):
     """Показывает подсказку (дата + значения ВСЕХ параметров) для колонки точек
-    рядом с курсором. Для отсутствующих в этот день параметров показывает 0.
+    рядом с курсором. Для отсутствующих в этот день параметров показывает
+    значение ближайшей точки (carry forward для нарастающего графика).
     """
     if not canvas.winfo_exists():
         return
@@ -660,28 +661,39 @@ def on_chart_hover(canvas, event):
     nearest = min(points, key=lambda p: abs(p["x"] - event.x))
     if abs(nearest["x"] - event.x) > 25:
         return
-    # все точки на той же дате
-    same_x = [p for p in points if p["date"] == nearest["date"]]
     x = nearest["x"]
     h = getattr(canvas, "_hover_h", 80)
     w = getattr(canvas, "_hover_w", 200)
     ff = _get_chart_font(canvas)
     # направляющая вертикальная линия
     canvas.create_line(x, 0, x, h, fill="#3a3f4d", dash=(2, 2), tags="hover")
-    # подсвеченные точки (только те что реально есть)
+    # подсвеченные точки (только те что реально есть на этой дате)
+    same_x = [p for p in points if p["date"] == nearest["date"]]
     for p in same_x:
         canvas.create_oval(p["x"] - 4, p["y"] - 4, p["x"] + 4, p["y"] + 4,
                             outline="#ffffff", width=1.5, fill=p["color"], tags="hover")
-    # собираем tooltip: все метки, подставляем 0 для отсутствующих
+    # собираем tooltip: для каждого элемента ищем ближайшую точку слева (<= x)
     all_labels = getattr(canvas, "_hover_all_labels", [])
-    present = {p["label"] for p in same_x}
     tip_lines = []
     for color, label in all_labels:
-        if label in present:
-            p = next(pp for pp in same_x if pp["label"] == label)
-            tip_lines.append((label, f'{p["label"]}: {p["value"]:.2f}', color))
+        matched = [p for p in same_x if p["label"] == label]
+        if matched:
+            p = matched[0]
+            tip_lines.append((label, f'{label}: {p["value"]:.2f}', color))
         else:
-            tip_lines.append((label, f"{label}: 0.00", color))
+            # нет точки на этой дате — ищем ближайшую слева (carry forward)
+            left_points = [p for p in points if p["label"] == label and p["x"] <= x]
+            if left_points:
+                closest = max(left_points, key=lambda p: p["x"])
+                tip_lines.append((label, f'{label}: {closest["value"]:.2f}', color))
+            else:
+                # нет точек слева — ищем ближайшую справа
+                right_points = [p for p in points if p["label"] == label and p["x"] > x]
+                if right_points:
+                    closest = min(right_points, key=lambda p: p["x"])
+                    tip_lines.append((label, f'{label}: {closest["value"]:.2f}', color))
+                else:
+                    tip_lines.append((label, f"{label}: 0.00", color))
     # текст подсказки
     raw_date = nearest["date"]
     if isinstance(raw_date, dt.date):
