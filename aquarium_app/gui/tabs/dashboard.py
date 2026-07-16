@@ -214,14 +214,9 @@ class DashboardTab:
                      font=(FF, 10, "bold"), bg=COLOR_ACCENT_SOFT,
                      fg=COLOR_TEXT).pack(side="left")
 
-            if wc_stats["total_l"] > 0:
-                tk.Label(wc_body, text=f"  |  {wc_stats['total_l']:.0f} л всего",
-                         font=(FF, 10), bg=COLOR_ACCENT_SOFT,
-                         fg=COLOR_TEXT_MUTED).pack(side="left")
-
             if wc_stats["total_pct"] > 0:
-                tk.Label(wc_body, text=f"  ({wc_stats['total_pct']:.0f}% объёма)",
-                         font=(FF, 9), bg=COLOR_ACCENT_SOFT,
+                tk.Label(wc_body, text=f"  |  {wc_stats['total_pct']:.0f}% объёма за 30 дн",
+                         font=(FF, 10), bg=COLOR_ACCENT_SOFT,
                          fg=COLOR_TEXT_MUTED).pack(side="left")
 
             if wc_stats["last_date"]:

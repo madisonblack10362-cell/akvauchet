@@ -247,12 +247,12 @@ class ReadingsTab:
             no3_s = _fmt(no3_v)
             ph_s = _fmt(ph_v)
 
-            wc_parts = []
-            if r["water_change_l"] is not None:
-                wc_parts.append(f"{r['water_change_l']:g} л")
             if r["water_change_pct"] is not None:
-                wc_parts.append(f"{r['water_change_pct']:.1f}%")
-            wc_str = ", ".join(wc_parts)
+                wc_str = f"{r['water_change_pct']:.1f}%"
+            elif r["water_change_l"] is not None:
+                wc_str = f"{r['water_change_l']:g} л"
+            else:
+                wc_str = ""
 
             values = {k: r[k] for k in MEASURED_PARAM_KEYS}
             flags = out_of_range_flags(self.conn, aq_id, values)

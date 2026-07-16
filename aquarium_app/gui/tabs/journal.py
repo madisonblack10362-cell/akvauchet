@@ -437,13 +437,15 @@ class JournalTab:
             wc_frame = tk.Frame(inner, bg="#0d2b1a", highlightbackground="#20c997",
                                 highlightthickness=1)
             wc_frame.pack(fill="x", pady=(4, 0))
-            parts = []
-            if wc_l is not None:
-                parts.append(f"{wc_l:g} л")
             if wc_pct is not None:
-                parts.append(f"{wc_pct:.1f}%")
-            tk.Label(wc_frame, text=f"Подмена воды: {', '.join(parts)}",
-                     bg="#0d2b1a", fg="#20c997", font=(FF, 9), padx=8, pady=4).pack(anchor="w")
+                wc_text = f"Подмена воды: {wc_pct:.1f}%"
+            elif wc_l is not None:
+                wc_text = f"Подмена воды: {wc_l:g} л"
+            else:
+                wc_text = ""
+            if wc_text:
+                tk.Label(wc_frame, text=wc_text,
+                         bg="#0d2b1a", fg="#20c997", font=(FF, 9), padx=8, pady=4).pack(anchor="w")
 
         # --- комментарий ---
         cmt = readings.get("comment") or ""
