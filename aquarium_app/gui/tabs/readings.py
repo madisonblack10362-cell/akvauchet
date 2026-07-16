@@ -54,9 +54,9 @@ class ReadingsTab:
         ttk.Label(filter_frame, text="Период графика:",
                   background=COLOR_BG, foreground=COLOR_TEXT_MUTED).pack(side="left")
 
-        self._trend_filter_var = tk.StringVar(value="30d")
+        self._trend_filter_var = tk.StringVar(value="7d")
         filter_btns_data = [
-            ("30d", "30 дн"), ("90d", "90 дн"),
+            ("7d", "7 дн"), ("30d", "30 дн"), ("90d", "90 дн"),
             ("180d", "180 дн"), ("365d", "365 дн"), ("all", "Всё"),
         ]
         self._trend_filter_btns = {}
@@ -105,13 +105,15 @@ class ReadingsTab:
         self.read_spin_vars = {}
         self.read_spin_entries = {}
         for key, formula, unit in MEASURED_PARAMS:
+            cell = tk.Frame(row_params, bg=COLOR_CARD)
+            cell.pack(side="left", padx=(0, 12))
             cfg = SPIN_SETTINGS.get(key, {"step": 0.1, "default": ""})
-            se = SpinEntry(row_params, width=7, step=cfg["step"],
+            se = SpinEntry(cell, width=7, step=cfg["step"],
                            default=cfg.get("default", ""))
-            se.pack(side="left", padx=(0, 10))
+            se.pack(side="left")
             lbl_text = f"{formula} {unit}".strip()
-            tk.Label(row_params, text=lbl_text, bg=COLOR_CARD, fg=COLOR_TEXT_MUTED,
-                     font=(FF, 9)).pack(side="left", padx=(0, 8))
+            tk.Label(cell, text=lbl_text, bg=COLOR_CARD, fg=COLOR_TEXT_MUTED,
+                     font=(FF, 9)).pack(side="left", padx=(6, 0))
             self.read_spin_vars[key] = se.var
             self.read_spin_entries[key] = se
 
@@ -121,11 +123,12 @@ class ReadingsTab:
         ttk.Label(row_wc, text="Подмена воды:", width=16, anchor="w",
                   background=COLOR_CARD).pack(side="left")
         self.read_wc_l_var = tk.StringVar()
-        wc_entry = ttk.Entry(row_wc, textvariable=self.read_wc_l_var, width=8)
+        wc_entry = ttk.Entry(row_wc, textvariable=self.read_wc_l_var, width=8,
+                             justify="center")
         wc_entry.pack(side="left")
         wc_entry.bind("<KeyRelease>", lambda e: self._update_read_wc_pct())
         ttk.Label(row_wc, text="л", background=COLOR_CARD, foreground=COLOR_TEXT_MUTED).pack(
-            side="left", padx=(2, 12))
+            side="left", padx=(4, 10))
         self.read_wc_pct_label = tk.Label(row_wc, text="= —%", bg=COLOR_CARD,
                                           fg=COLOR_TEXT_MUTED, font=(FF, 9))
         self.read_wc_pct_label.pack(side="left")
