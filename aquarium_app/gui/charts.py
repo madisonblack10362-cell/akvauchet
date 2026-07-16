@@ -388,18 +388,24 @@ def draw_daily_bars_chart(
         global_max = 1.0
 
     # ---- календарная шкала X ----
+    # Безопасный парсинг дат: data может быть str или dt.date
+    def _parse_date(raw):
+        if isinstance(raw, dt.date):
+            return raw
+        return dt.date.fromisoformat(str(raw))
+
     all_dates_set = set()
     for _k, _c, _l, hist in elem_data:
-        for date_iso, _v in hist:
+        for date_raw, _v in hist:
             try:
-                all_dates_set.add(dt.date.fromisoformat(date_iso))
+                all_dates_set.add(_parse_date(date_raw))
             except Exception:
                 pass
-    all_dates_sorted = sorted(all_dates_set)
+    all_dates_sorted = sorted(all_dates_set)  # list[dt.date]
     today = dt.date.today()
     if since_iso:
         try:
-            period_start = dt.date.fromisoformat(since_iso)
+            period_start = _parse_date(since_iso)
         except Exception:
             period_start = min(all_dates_sorted) if all_dates_sorted else today
     elif days is not None:
@@ -449,15 +455,17 @@ def draw_daily_bars_chart(
 
     hover_points = []
 
-    for date_iso in all_dates_sorted:
-        d = dt.date.fromisoformat(date_iso)
+    for d in all_dates_sorted:
+        # d уже dt.date — не нужно парсить
+        d_iso = d.isoformat()
         gx = x_for_date(d)
 
         # собираем значения для этой даты по всем элементам
         day_vals = {}
         for key, color, label, hist in elem_data:
             for di, vi in hist:
-                if di == date_iso and isinstance(vi, (int, float)):
+                di_str = di.isoformat() if isinstance(di, dt.date) else str(di)
+                if di_str == d_iso and isinstance(vi, (int, float)):
                     day_vals[key] = vi
                     break
 
@@ -502,7 +510,7 @@ def draw_daily_bars_chart(
                                    font=(font_family, 6, "bold"))
 
             hover_points.append({"x": bx + bar_w / 2, "y": bar_top,
-                                  "date": date_iso, "value": v,
+                                  "date": d_iso, "value": v,
                                   "label": label, "color": color})
 
     # ---- ось X (даты) ----
@@ -579,7 +587,11 @@ def on_chart_hover(canvas, event):
         canvas.create_oval(p["x"] - 4, p["y"] - 4, p["x"] + 4, p["y"] + 4,
                             outline="#ffffff", width=1.5, fill=p["color"], tags="hover")
     # текст подсказки: дата + по строке на каждый параметр, в рамке
-    date_str = from_iso(nearest["date"])
+    raw_date = nearest["date"]
+    if isinstance(raw_date, dt.date):
+        date_str = raw_date.strftime("%d.%m.%Y")
+    else:
+        date_str = from_iso(raw_date)
     lines = [f'{p["label"]}: {p["value"]:.2f}' for p in same_x]
     line_h = 13
     box_h = line_h * (len(lines) + 1) + 6
@@ -614,33 +626,25 @@ def on_chart_leave(canvas):
 # обработчик продолжал перезаписывать новый график. Фикс: генерационный
 # счётчик — устаревшие обработчики просто игнорируются.
 
-_schedule_gen = 0  # модульный счётчик поколения
-
-
 def schedule_chart_draw(canvas, draw_fn, *args, **kwargs):
     """Планирует отрисовку диаграммы после того, как canvas получит реальную ширину.
     Также перерисовывает при изменении размера окна.
 
-    Каждый вызов увеличивает поколение (gen). Отложенные и resize-обработчики
-    проверяют, что их gen совпадает с текущим — если нет, пропускают.
-    Это предотвращает накопление старых обработчиков, которые перезаписывали
-    новый график.
+    Поколение (gen) хранится НА САМОМ CANVAS — каждый canvas независим.
+    При новом вызове gen увеличивается, и старые обработчики этого же
+    canvas игнорируются. Другие canvas'ы не затрагиваются.
 
     Parameters
     ----------
     canvas : tk.Canvas
-        Холст, на котором рисуется график.
     draw_fn : callable
-        Функция отрисовки (первый аргумент — canvas).
     *args, **kwargs
-        Передаются в draw_fn после canvas.
     """
-    global _schedule_gen
-    _schedule_gen += 1
-    my_gen = _schedule_gen
+    my_gen = getattr(canvas, "_chart_draw_gen", 0) + 1
+    canvas._chart_draw_gen = my_gen
 
     def deferred_draw():
-        if canvas.winfo_exists() and _schedule_gen == my_gen:
+        if canvas.winfo_exists() and canvas._chart_draw_gen == my_gen:
             draw_fn(canvas, *args, **kwargs)
 
     canvas.after(50, deferred_draw)
@@ -648,7 +652,7 @@ def schedule_chart_draw(canvas, draw_fn, *args, **kwargs):
     def on_resize(event):
         if not canvas.winfo_exists():
             return
-        if _schedule_gen != my_gen:
+        if canvas._chart_draw_gen != my_gen:
             return  # устаревший обработчик — пропускаем
         if not hasattr(canvas, "_last_w") or canvas._last_w != event.width:
             canvas._last_w = event.width
