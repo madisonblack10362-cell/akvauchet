@@ -672,7 +672,7 @@ def on_chart_hover(canvas, event):
 
     tip_lines = []
 
-    # ===== БЛОК 1: Показания параметров + расход =====
+    # ===== БЛОК 1: Показания параметров (чистые значения) =====
     all_labels = getattr(canvas, "_hover_all_labels", [])
     for color, label in all_labels:
         matched = [p for p in same_x if p["label"] == label]
@@ -692,42 +692,52 @@ def on_chart_hover(canvas, event):
                 else:
                     tip_lines.append(("val", f"{label}: 0", color))
 
-        # --- расход по элементу: съели X, ~Y/день ---
-        real_matched = [p for p in same_x if p["label"] == label]
-        if real_matched:
-            p = real_matched[0]
-            val = p["value"]
-            pkey = p.get("_key", "")
-            if pkey and pkey in param_hist:
-                hist = param_hist[pkey]
-                cur_idx = None
-                for i, (d, v) in enumerate(hist):
-                    if d == hover_iso and v == val:
-                        cur_idx = i
-                        break
-                if cur_idx is not None and cur_idx > 0:
-                    prev_d, prev_v = hist[cur_idx - 1]
-                    delta = val - prev_v
-                    consumed = -delta
-                    try:
-                        d_cur = dt.date.fromisoformat(hover_iso)
-                        d_prev = dt.date.fromisoformat(prev_d)
-                        days_diff = (d_cur - d_prev).days
-                        if days_diff > 0:
-                            daily = consumed / days_diff
-                            tip_lines.append(("rate", f"  съели {fmt_axis(consumed)}, ~{fmt_axis(daily)}/день", COLOR_TEXT_MUTED))
-                        else:
-                            tip_lines.append(("rate", f"  съели {fmt_axis(consumed)}", COLOR_TEXT_MUTED))
-                    except Exception:
-                        tip_lines.append(("rate", f"  съели {fmt_axis(consumed)}", COLOR_TEXT_MUTED))
-
     # подмена
     wc_matched = [p for p in same_x if p.get("_is_wc")]
     if wc_matched:
         p = wc_matched[0]
         tip_lines.append(("wc", f'Подмена: {p["value"]:.1f}%', "#20c997"))
 
-    # ===== РАЗДЕЛИТЕЛЬ + БЛОК 2: Внесено удобрений + дозирование =====
+    # ===== БЛОК 2: Израсходовано (отдельный блок) =====
+    consumed_lines = []
+    for color, label in all_labels:
+        real_matched = [p for p in same_x if p["label"] == label]
+        if not real_matched:
+            continue
+        p = real_matched[0]
+        val = p["value"]
+        pkey = p.get("_key", "")
+        if not pkey or pkey not in param_hist:
+            continue
+        hist = param_hist[pkey]
+        cur_idx = None
+        for i, (d, v) in enumerate(hist):
+            if d == hover_iso and v == val:
+                cur_idx = i
+                break
+        if cur_idx is not None and cur_idx > 0:
+            prev_d, prev_v = hist[cur_idx - 1]
+            delta = val - prev_v
+            consumed = -delta
+            try:
+                d_cur = dt.date.fromisoformat(hover_iso)
+                d_prev = dt.date.fromisoformat(prev_d)
+                days_diff = (d_cur - d_prev).days
+                if days_diff > 0:
+                    daily = consumed / days_diff
+                    consumed_lines.append(f"{label}: {fmt_axis(consumed)} (~{fmt_axis(daily)}/день)")
+                else:
+                    consumed_lines.append(f"{label}: {fmt_axis(consumed)}")
+            except Exception:
+                consumed_lines.append(f"{label}: {fmt_axis(consumed)}")
+
+    if consumed_lines:
+        tip_lines.append(("sep", "", ""))
+        tip_lines.append(("cons_hdr", "Израсходовано:", "#ff6b6b"))
+        for cl in consumed_lines:
+            tip_lines.append(("cons", f"  {cl}", "#ff6b6b"))
+
+    # ===== БЛОК 3: Внесено удобрений + дозирование =====
     if dose_list or (hover_date and dose_dates_set):
         tip_lines.append(("sep", "", ""))
         if dose_list:
@@ -781,7 +791,7 @@ def on_chart_hover(canvas, event):
             sep_f.pack(fill="x")
             tk.Frame(sep_f, bg=COLOR_BORDER, height=1).pack(fill="x", pady=(1, 0))
             continue
-        is_bold = _lbl in ("dose_hdr",)
+        is_bold = _lbl in ("dose_hdr", "cons_hdr")
         fnt = (ff, 8, "bold") if is_bold else (ff, 8)
         tk.Label(pad_frame, text=text, bg="#05060a", fg=color,
                  font=fnt, anchor="w", pady=0).pack(fill="x")
