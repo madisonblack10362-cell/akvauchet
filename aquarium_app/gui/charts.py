@@ -669,24 +669,33 @@ def on_chart_hover(canvas, event):
     # --- счётчики «дней от …» ---
     meta_lines = []
     if hover_date:
-        prev_wc = [d for d in wc_dates_set if d < hover_iso]
+        # дней от последней подмены (включая сегодняшний день)
+        prev_wc = [d for d in wc_dates_set if d <= hover_iso]
         if prev_wc:
             try:
                 last_wc = max(dt.date.fromisoformat(d) for d in prev_wc)
                 days_wc = (hover_date - last_wc).days
-                meta_lines.append((f"Подмена: {days_wc} дн. назад", "#20c997"))
+                if days_wc == 0:
+                    meta_lines.append(("Подмена: сегодня", "#20c997"))
+                else:
+                    meta_lines.append((f"Подмена: {days_wc} дн. назад", "#20c997"))
             except Exception:
                 pass
-        prev_dose = [d for d in dose_dates_set if d < hover_iso]
+        # дней от последнего внесения (включая сегодняшний день)
+        prev_dose = [d for d in dose_dates_set if d <= hover_iso]
         if prev_dose:
             try:
                 last_dose = max(dt.date.fromisoformat(d) for d in prev_dose)
                 days_dose = (hover_date - last_dose).days
-                meta_lines.append((f"Дозирование: {days_dose} дн. назад", "#fcc419"))
+                if days_dose == 0:
+                    meta_lines.append(("Дозирование: сегодня", "#fcc419"))
+                else:
+                    meta_lines.append((f"Дозирование: {days_dose} дн. назад", "#fcc419"))
             except Exception:
                 pass
 
     # собираем tooltip: для каждого элемента ищем ближайшую точку
+    # дельту и расход ставим СРАЗУ после значения элемента
     all_labels = getattr(canvas, "_hover_all_labels", [])
     tip_lines = []
     for color, label in all_labels:
@@ -707,49 +716,36 @@ def on_chart_hover(canvas, event):
                 else:
                     tip_lines.append(("val", f"{label}: 0", color))
 
-    # --- дельта, расход/день, норма ---
-    for color, label in all_labels:
-        matched = [p for p in same_x if p["label"] == label]
-        if not matched:
-            continue
-        p = matched[0]
-        val = p["value"]
-        pkey = ""
-        for pp in points:
-            if pp["label"] == label:
-                pkey = pp.get("_key", "")
-                break
-        if not pkey or pkey not in param_hist:
-            continue
-        hist = param_hist[pkey]
-        cur_idx = None
-        for i, (d, v) in enumerate(hist):
-            if d == hover_iso and v == val:
-                cur_idx = i
-                break
-        if cur_idx is None:
-            continue
-        if cur_idx > 0:
-            prev_d, prev_v = hist[cur_idx - 1]
-            delta = val - prev_v
-            arrow = "+" if delta > 0 else ""
-            delta_color = "#ff6b6b" if delta > 0 else "#51cf66"
-            tip_lines.append(("delta", f"  {arrow}{fmt_axis(delta)}", delta_color))
-            try:
-                d_cur = dt.date.fromisoformat(hover_iso)
-                d_prev = dt.date.fromisoformat(prev_d)
-                days_diff = (d_cur - d_prev).days
-                if days_diff > 0:
-                    daily = -delta / days_diff
-                    tip_lines.append(("rate", f"  ~{fmt_axis(daily)}/день", COLOR_TEXT_MUTED))
-            except Exception:
-                pass
-        if pkey in target_ranges:
-            t_min, t_max = target_ranges[pkey]
-            if t_min is not None and t_max is not None:
-                tip_lines.append(("target", f"  норма: {fmt_axis(t_min)}-{fmt_axis(t_max)}", "#4dabf7"))
+        # --- дельта и расход/день сразу после значения ---
+        real_matched = [p for p in same_x if p["label"] == label]
+        if real_matched:
+            p = real_matched[0]
+            val = p["value"]
+            pkey = p.get("_key", "")
+            if pkey and pkey in param_hist:
+                hist = param_hist[pkey]
+                cur_idx = None
+                for i, (d, v) in enumerate(hist):
+                    if d == hover_iso and v == val:
+                        cur_idx = i
+                        break
+                if cur_idx is not None and cur_idx > 0:
+                    prev_d, prev_v = hist[cur_idx - 1]
+                    delta = val - prev_v
+                    arrow = "+" if delta > 0 else ""
+                    delta_color = "#ff6b6b" if delta > 0 else "#51cf66"
+                    tip_lines.append(("delta", f"  {arrow}{fmt_axis(delta)}", delta_color))
+                    try:
+                        d_cur = dt.date.fromisoformat(hover_iso)
+                        d_prev = dt.date.fromisoformat(prev_d)
+                        days_diff = (d_cur - d_prev).days
+                        if days_diff > 0:
+                            daily = -delta / days_diff
+                            tip_lines.append(("rate", f"  ~{fmt_axis(daily)}/день", COLOR_TEXT_MUTED))
+                    except Exception:
+                        pass
 
-    # подмена — отдельно
+    # подмена — отдельно, без carry-forward
     wc_matched = [p for p in same_x if p.get("_is_wc")]
     if wc_matched:
         p = wc_matched[0]
@@ -760,6 +756,8 @@ def on_chart_hover(canvas, event):
     dose_list = []
     if dose_map:
         dose_list = dose_map.get(hover_iso, [])
+
+    # разделитель + доп. инфо + дозировки
     if dose_list or meta_lines:
         tip_lines.append(("sep", "", ""))
         for txt, clr in meta_lines:
