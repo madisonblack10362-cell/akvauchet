@@ -76,6 +76,7 @@ python -m PyInstaller ^
     --clean ^
     --icon aquarium_app.ico ^
     --add-data "aquarium_app;aquarium_app" ^
+    --add-data "aquarium_app.ico;." ^
     --hidden-import aquarium_app.db ^
     --hidden-import aquarium_app.gui ^
     --hidden-import aquarium_app.logic ^

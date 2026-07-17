@@ -427,18 +427,21 @@ class App(
                     "AquaUchet.AquariumApp.1")
             except (AttributeError, OSError):
                 pass
-        # при frozen (.exe) ищем иконку рядом с экзешником, в temp её нет
+        # порядок поиска: рядом с .exe > внутри бандла (PyInstaller) > resources
+        search_dirs = [RESOURCES_DIR]
         if getattr(sys, "frozen", False):
             exe_dir = os.path.dirname(os.path.abspath(sys.executable))
-        else:
-            exe_dir = RESOURCES_DIR
-        icon_path_ico = os.path.join(exe_dir, "aquarium_app.ico")
-        icon_path_png = os.path.join(exe_dir, "icon.png")
-        # фолбэк в resources
-        if not os.path.exists(icon_path_ico):
-            icon_path_ico = os.path.join(RESOURCES_DIR, "aquarium_app.ico")
-        if not os.path.exists(icon_path_png):
-            icon_path_png = os.path.join(RESOURCES_DIR, "icon.png")
+            search_dirs.insert(0, exe_dir)
+        icon_path_ico = None
+        icon_path_png = None
+        for d in search_dirs:
+            candidate = os.path.join(d, "aquarium_app.ico")
+            if os.path.exists(candidate):
+                icon_path_ico = candidate
+                break
+            candidate = os.path.join(d, "icon.png")
+            if os.path.exists(candidate) and icon_path_png is None:
+                icon_path_png = candidate
         self._icon_photo = None
         if os.path.exists(icon_path_ico):
             try:
