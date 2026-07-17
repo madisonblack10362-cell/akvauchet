@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import datetime as dt
+import json
 import tkinter as tk
-from tkinter import ttk, messagebox
+from tkinter import ttk, messagebox, filedialog
 
 from aquarium_app.config import (
     COLOR_BG, COLOR_CARD, COLOR_ACCENT, COLOR_BORDER, COLOR_TEXT,
@@ -76,6 +77,10 @@ class DosingTab:
                   bg=COLOR_ACCENT_SOFT, fg=COLOR_ACCENT, activebackground=COLOR_ALT_ROW,
                   activeforeground=COLOR_ACCENT, borderwidth=0, padx=10, pady=3,
                   command=self._open_dose_calculator, cursor="hand2").pack(side="right")
+        tk.Button(top, text="Импорт JSON", font=(FF, 9), relief="flat",
+                  bg=COLOR_CARD, fg=COLOR_TEXT, activebackground=COLOR_ALT_ROW,
+                  borderwidth=0, padx=10, pady=3, cursor="hand2",
+                  command=self.import_dosing_json).pack(side="right", padx=(0, 6))
 
         # ---- сводная полоса: карточки элементов ----
         self._dose_summary_frame = tk.Frame(tab, bg=COLOR_BG)
@@ -839,3 +844,60 @@ class DosingTab:
 
     def _schedule_dosing_trend_chart_draw(self, canvas, draw_fn, *args, **kwargs):
         schedule_chart_draw(canvas, draw_fn, *args, **kwargs)
+
+    # ------------------------------------------------------------------
+    # Импорт из JSON
+    # ------------------------------------------------------------------
+
+    def import_dosing_json(self):
+        path = filedialog.askopenfilename(
+            title="Импорт дозировок из JSON",
+            filetypes=[("JSON файлы", "*.json"), ("Все файлы", "*.*")],
+        )
+        if not path:
+            return
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+        except Exception as e:
+            messagebox.showerror("Ошибка", f"Не удалось прочитать файл:\n{e}")
+            return
+        if not isinstance(data, list):
+            messagebox.showerror("Ошибка", "Файл должен содержать JSON-массив записей.")
+            return
+        aq_id = getattr(self, "_dosing_aq_id", None)
+        if aq_id is None:
+            messagebox.showwarning("Внимание", "Сначала выберите аквариум.")
+            return
+        # строим карту имя_удобрения -> fert_id
+        ferts = get_fertilizers(self.conn)
+        fert_map = {f["name"]: f["id"] for f in ferts}
+        imported = 0
+        errors = 0
+        not_found = set()
+        for item in data:
+            try:
+                date = item.get("date")
+                fert_name = item.get("fertilizer") or item.get("fert_name")
+                dose = item.get("dose")
+                if not date or not fert_name or dose is None:
+                    errors += 1
+                    continue
+                fert_id = fert_map.get(fert_name)
+                if fert_id is None:
+                    not_found.add(fert_name)
+                    errors += 1
+                    continue
+                comment = item.get("comment", "")
+                add_dosing(self.conn, aq_id, date, fert_id, float(dose), comment=comment)
+                imported += 1
+            except Exception:
+                errors += 1
+        self.refresh_dosing_table()
+        self.refresh_dosing_trend()
+        msg = f"Импортировано: {imported}"
+        if errors:
+            msg += f"\nОшибок: {errors}"
+        if not_found:
+            msg += f"\nНе найдены удобрения: {', '.join(not_found)}"
+        messagebox.showinfo("Импорт завершён", msg)

@@ -2,8 +2,9 @@
 from __future__ import annotations
 
 import datetime as dt
+import json
 import tkinter as tk
-from tkinter import ttk, messagebox
+from tkinter import ttk, messagebox, filedialog
 
 from aquarium_app.config import (
     COLOR_BG, COLOR_CARD, COLOR_ACCENT, COLOR_BORDER, COLOR_TEXT,
@@ -47,6 +48,11 @@ class ReadingsTab:
         self.readings_aq_combo.pack(side="left", padx=(6, 0))
         self.readings_aq_combo.bind("<<ComboboxSelected>>",
                                      lambda e: self._on_readings_aq_changed())
+
+        tk.Button(top, text="Импорт JSON", font=(FF, 9), relief="flat",
+                  bg=COLOR_CARD, fg=COLOR_TEXT, activebackground=COLOR_ALT_ROW,
+                  borderwidth=0, padx=10, pady=3, cursor="hand2",
+                  command=self.import_readings_json).pack(side="right")
 
         # --- фильтр периода графика ---
         filter_frame = tk.Frame(parent, bg=COLOR_BG)
@@ -645,3 +651,61 @@ class ReadingsTab:
             wc_events=wc_events if wc_events else None,
             dose_events=dose_events if dose_events else None,
         )
+
+    # ------------------------------------------------------------------
+    # Импорт из JSON
+    # ------------------------------------------------------------------
+
+    def import_readings_json(self):
+        path = filedialog.askopenfilename(
+            title="Импорт показаний из JSON",
+            filetypes=[("JSON файлы", "*.json"), ("Все файлы", "*.*")],
+        )
+        if not path:
+            return
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+        except Exception as e:
+            messagebox.showerror("Ошибка", f"Не удалось прочитать файл:\n{e}")
+            return
+        if not isinstance(data, list):
+            messagebox.showerror("Ошибка", "Файл должен содержать JSON-массив записей.")
+            return
+        aq_id = self._current_read_aq_id()
+        if aq_id is None:
+            messagebox.showwarning("Внимание", "Сначала выберите аквариум.")
+            return
+        allowed_params = {"no3", "po4", "k", "fe", "mg", "ca", "gh", "kh", "ph"}
+        imported = 0
+        errors = 0
+        for item in data:
+            try:
+                date = item.get("date")
+                if not date:
+                    errors += 1
+                    continue
+                values = {}
+                for k in allowed_params:
+                    if k in item and item[k] is not None:
+                        values[k] = float(item[k])
+                wc_pct = item.get("water_change_pct")
+                wc_l = item.get("water_change_l")
+                if wc_pct is not None:
+                    wc_pct = float(wc_pct)
+                if wc_l is not None:
+                    wc_l = float(wc_l)
+                comment = item.get("comment", "")
+                add_reading(self.conn, aq_id, date, values,
+                            comment=comment,
+                            water_change_pct=wc_pct,
+                            water_change_l=wc_l)
+                imported += 1
+            except Exception:
+                errors += 1
+        self.refresh_readings_table()
+        self._refresh_readings_chart()
+        msg = f"Импортировано: {imported}"
+        if errors:
+            msg += f"\nОшибок: {errors}"
+        messagebox.showinfo("Импорт завершён", msg)
