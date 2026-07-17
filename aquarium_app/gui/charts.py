@@ -662,24 +662,37 @@ def on_chart_hover(canvas, event):
         tip_lines.append(("wc", f'Подмена: {p["value"]:.1f}%', "#20c997"))
     # дозировки — из предзагруженных данных
     dose_map = getattr(canvas, "_dose_events", {})
+    dose_list = []
     if dose_map:
         raw = nearest["date"]
         d_key = raw if isinstance(raw, str) else raw.isoformat()
         dose_list = dose_map.get(d_key, [])
-        if dose_list:
-            tip_lines.append(("dose_hdr", "Удобрения:", "#fcc419"))
-            for entry in dose_list:
-                tip_lines.append(("dose", f"  {entry}", "#fcc419"))
+    if dose_list:
+        # разделитель перед блоком удобрений
+        tip_lines.append(("sep", "", ""))
+        tip_lines.append(("dose_hdr", "Удобрения:", "#fcc419"))
+        for entry in dose_list:
+            tip_lines.append(("dose", entry, "#fcc419"))
     # текст подсказки
     raw_date = nearest["date"]
     if isinstance(raw_date, dt.date):
         date_str = raw_date.strftime("%d.%m.%Y")
     else:
         date_str = from_iso(raw_date)
-    lines = [t for _, t, _ in tip_lines]
-    line_h = 13
-    box_h = line_h * (len(lines) + 1) + 6
-    text_w = max(7 * len(t) for t in [date_str] + lines) + 14
+    # собираем текстовые строки для подсчёта ширины
+    vis_lines = [t for _lbl, t, _c in tip_lines if _lbl != "sep"]
+    n_vis = len(vis_lines) + 1  # +1 для даты
+    line_h = 14
+    n_seps = sum(1 for _lbl, _, _ in tip_lines if _lbl == "sep")
+    box_h = line_h * n_vis + 4 * n_seps + 10
+    # точная ширина через measure_text
+    tmp = canvas.create_text(0, 0, text="", font=(ff, 8, "bold"))
+    max_tw = 0
+    for t in [date_str] + vis_lines:
+        canvas.itemconfig(tmp, text=t)
+        max_tw = max(max_tw, canvas.bbox(tmp)[2] - canvas.bbox(tmp)[0])
+    canvas.delete(tmp)
+    text_w = max_tw + 18
     tx = x + 8
     if tx + text_w > w:
         tx = max(0, x - text_w - 8)
@@ -688,12 +701,23 @@ def on_chart_hover(canvas, event):
         ty = max(0, h - box_h - 2)
     canvas.create_rectangle(tx, ty, tx + text_w, ty + box_h,
                              fill="#05060a", outline=COLOR_BORDER, tags="hover")
-    canvas.create_text(tx + 7, ty + 7, anchor="w", text=date_str,
+    # левый отступ для текста (центрируем по самой длинной строке)
+    pad_l = (text_w - max_tw) // 2
+    cur_y = ty + 7
+    canvas.create_text(tx + pad_l, cur_y, anchor="w", text=date_str,
                         fill=COLOR_TEXT_MUTED, font=(ff, 7), tags="hover")
-    for i, (_lbl, text, color) in enumerate(tip_lines):
-        canvas.create_text(tx + 7, ty + 7 + line_h * (i + 1), anchor="w",
+    cur_y += line_h
+    for _lbl, text, color in tip_lines:
+        if _lbl == "sep":
+            # тонкая линия-разделитель
+            canvas.create_line(tx + 6, cur_y - 1, tx + text_w - 6, cur_y - 1,
+                               fill=COLOR_BORDER, dash=(2, 2), tags="hover")
+            cur_y += 4
+            continue
+        canvas.create_text(tx + pad_l, cur_y, anchor="w",
                             text=text,
                             fill=color, font=(ff, 8, "bold"), tags="hover")
+        cur_y += line_h
 
 
 def on_chart_leave(canvas):
