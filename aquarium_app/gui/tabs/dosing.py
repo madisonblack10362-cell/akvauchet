@@ -30,7 +30,7 @@ from aquarium_app.gui.charts import (
 from aquarium_app.gui.widgets import DateEntry, SpinEntry
 
 # Ключевые элементы для сводных карточек
-SUMMARY_KEYS = ["no3", "po4", "k", "fe", "mg"]
+SUMMARY_KEYS = ["po4", "no3", "k", "fe", "mg"]
 SUMMARY_INFO = {
     "no3": ("Нитрат", "NO3", ELEMENT_COLORS["no3"]),
     "po4": ("Фосфат", "PO4", ELEMENT_COLORS["po4"]),
