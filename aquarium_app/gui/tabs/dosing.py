@@ -270,11 +270,13 @@ class DosingTab:
         tk.Label(preview_inner, text="Прирост:", bg=COLOR_BG, fg=COLOR_TEXT_MUTED,
                  font=(self.FF, 8, "bold")).pack(side="left", padx=(0, 6))
 
+        macro = {"no3", "po4", "k"}
         for ek, val in active:
             color = ELEMENT_COLORS.get(ek, COLOR_ACCENT)
             formula = ELEMENT_FORMULA.get(ek, ek)
-            # формат с адаптивной точностью
-            if val < 0.01:
+            if ek in macro:
+                txt = f"{formula} +{val:.1f}"
+            elif val < 0.01:
                 txt = f"{formula} +{val:.4f}"
             elif val < 1:
                 txt = f"{formula} +{val:.3f}"
@@ -318,7 +320,9 @@ class DosingTab:
             tk.Label(inner, text=formula, bg=COLOR_CARD, fg=COLOR_TEXT_MUTED,
                      font=(FF, 8)).pack(anchor="w")
             # значение
-            if v < 0.01:
+            if ek in ("no3", "po4", "k"):
+                val_text = f"{v:.1f}"
+            elif v < 0.01:
                 val_text = f"{v:.4f}"
             elif v < 1:
                 val_text = f"{v:.3f}"
@@ -401,9 +405,9 @@ class DosingTab:
                 r["fert_name"] or "",
                 f"{r['dose']:g}",
                 comment,
-                f"{delta['no3']:.3f}" if delta["no3"] else "",
-                f"{delta['po4']:.3f}" if delta["po4"] else "",
-                f"{delta['k']:.2f}" if delta["k"] else "",
+                f"{delta['no3']:.1f}" if delta["no3"] else "",
+                f"{delta['po4']:.1f}" if delta["po4"] else "",
+                f"{delta['k']:.1f}" if delta["k"] else "",
                 f"{delta['fe']:.4f}" if delta["fe"] else "",
                 f"{delta['mg']:.3f}" if delta["mg"] else "",
                 f"{delta['ca']:.3f}" if delta["ca"] else "",
