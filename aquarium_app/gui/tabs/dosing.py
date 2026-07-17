@@ -505,53 +505,60 @@ class DosingTab:
 
     def _dosing_form_dialog(self, title, entry=None):
         FF = self.FF
+        parent = self.root if hasattr(self, "root") else self
 
-        dlg = tk.Toplevel(self.root if hasattr(self, "root") else self)
+        dlg = tk.Toplevel(parent)
         dlg.title(title)
         dlg.configure(bg=COLOR_BG)
-        dlg.transient(dlg.master)
+        dlg.transient(parent)
         dlg.grab_set()
         dlg.resizable(False, False)
 
-        pad = dict(padx=12, pady=6)
+        inner = tk.Frame(dlg, bg=COLOR_CARD, padx=16, pady=12)
+        inner.pack(padx=16, pady=16)
 
-        row_date = tk.Frame(dlg, bg=COLOR_BG)
-        row_date.pack(fill="x", **pad, pady=(12, 3))
-        tk.Label(row_date, text="Дата:", font=(FF, 10), width=14, anchor="w",
-                 bg=COLOR_BG, fg=COLOR_TEXT_SOFT).pack(side="left")
+        # дата
+        row_date = tk.Frame(inner, bg=COLOR_CARD)
+        row_date.pack(fill="x", pady=4)
+        tk.Label(row_date, text="Дата:", width=14, anchor="w",
+                 bg=COLOR_CARD, fg=COLOR_TEXT, font=(FF, 10)).pack(side="left")
         date_entry = DateEntry(row_date, font_family=FF, width=12,
                                default=from_iso(entry["date"]) if entry else None)
-        date_entry.pack(side="left", padx=(2, 0))
+        date_entry.pack(side="left")
 
-        row_fert = tk.Frame(dlg, bg=COLOR_BG)
-        row_fert.pack(fill="x", **pad)
-        tk.Label(row_fert, text="Удобрение:", font=(FF, 10), width=14, anchor="w",
-                 bg=COLOR_BG, fg=COLOR_TEXT_SOFT).pack(side="left")
+        # удобрение
+        row_fert = tk.Frame(inner, bg=COLOR_CARD)
+        row_fert.pack(fill="x", pady=4)
+        tk.Label(row_fert, text="Удобрение:", width=14, anchor="w",
+                 bg=COLOR_CARD, fg=COLOR_TEXT, font=(FF, 10)).pack(side="left")
         ferts = get_fertilizers(self.conn)
         fert_names = [f["name"] for f in ferts]
         fert_name_var = tk.StringVar(value=entry["fert_name"] if entry else "")
         fert_combo = ttk.Combobox(row_fert, textvariable=fert_name_var,
                                    values=fert_names, state="readonly", width=36)
-        fert_combo.pack(side="left", padx=(2, 0))
+        fert_combo.pack(side="left")
 
-        row_dose = tk.Frame(dlg, bg=COLOR_BG)
-        row_dose.pack(fill="x", **pad)
-        tk.Label(row_dose, text="Доза (мл):", font=(FF, 10), width=14, anchor="w",
-                 bg=COLOR_BG, fg=COLOR_TEXT_SOFT).pack(side="left")
+        # доза
+        row_dose = tk.Frame(inner, bg=COLOR_CARD)
+        row_dose.pack(fill="x", pady=4)
+        tk.Label(row_dose, text="Доза (мл):", width=14, anchor="w",
+                 bg=COLOR_CARD, fg=COLOR_TEXT, font=(FF, 10)).pack(side="left")
         dose_spin = SpinEntry(row_dose, width=10, step=0.1, font_family=FF,
                                default=f"{entry['dose']:g}" if entry else "1.0")
-        dose_spin.pack(side="left", padx=(2, 0))
+        dose_spin.pack(side="left")
 
-        row_comm = tk.Frame(dlg, bg=COLOR_BG)
-        row_comm.pack(fill="x", **pad)
-        tk.Label(row_comm, text="Комментарий:", font=(FF, 10), width=14, anchor="w",
-                 bg=COLOR_BG, fg=COLOR_TEXT_SOFT).pack(side="left")
-        comm_var = tk.StringVar(value=entry["comment"] if entry else "")
+        # комментарий
+        row_comm = tk.Frame(inner, bg=COLOR_CARD)
+        row_comm.pack(fill="x", pady=4)
+        tk.Label(row_comm, text="Комментарий:", width=14, anchor="w",
+                 bg=COLOR_CARD, fg=COLOR_TEXT, font=(FF, 10)).pack(side="left")
+        comm_var = tk.StringVar(value=(entry["comment"] or "") if entry else "")
         ttk.Entry(row_comm, textvariable=comm_var, width=40).pack(
-            side="left", padx=(2, 0), fill="x", expand=True)
+            side="left", fill="x", expand=True)
 
-        btn_row = tk.Frame(dlg, bg=COLOR_BG)
-        btn_row.pack(fill="x", padx=12, pady=(6, 12))
+        # кнопки
+        btn_row = tk.Frame(inner, bg=COLOR_CARD)
+        btn_row.pack(fill="x", pady=(10, 0))
 
         result = [None]
 
