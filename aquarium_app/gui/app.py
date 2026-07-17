@@ -449,7 +449,7 @@ class App(
                 return
             except tk.TclError:
                 pass
-        if os.path.exists(icon_path_png):
+        if icon_path_png and os.path.exists(icon_path_png):
             try:
                 self._icon_photo = tk.PhotoImage(file=icon_path_png)
                 self.iconphoto(True, self._icon_photo)
