@@ -336,6 +336,7 @@ def draw_param_trend_chart(
     canvas._target_ranges = target_ranges or {}
     # даты подмен и дозировок (для счётчика «дней от …»)
     canvas._wc_dates_set = set(d for d, _ in (wc_events or []))
+    canvas._wc_events_map = {d: pct for d, pct in (wc_events or [])}
     canvas._dose_dates_set = set(dose_events.keys()) if dose_events else set()
     canvas.bind("<Motion>", lambda e, c=canvas: on_chart_hover(c, e))
     canvas.bind("<Leave>", lambda e, c=canvas: on_chart_leave(c))
@@ -686,11 +687,11 @@ def on_chart_hover(canvas, event):
                 else:
                     tip_lines.append(("val", f"{label}: 0", color))
 
-    # подмена
-    wc_matched = [p for p in same_x if p.get("_is_wc")]
-    if wc_matched:
-        p = wc_matched[0]
-        tip_lines.append(("wc", f'Подмена: {p["value"]:.1f}%', "#20c997"))
+    # подмена — берём из wc_events, а не из точек графика
+    wc_events_map = getattr(canvas, "_wc_events_map", {})
+    wc_pct = wc_events_map.get(hover_iso)
+    if wc_pct is not None:
+        tip_lines.append(("wc", f'Подмена: {wc_pct:.1f}%', "#20c997"))
 
     # ===== БЛОК 2: Израсходовано (отдельный блок) =====
     consumed_lines = []  # [(label, elem_color, consumed_text, val_color), ...]
