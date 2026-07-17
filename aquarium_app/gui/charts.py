@@ -714,9 +714,13 @@ def on_chart_hover(canvas, event):
             prev_d, prev_v = hist[cur_idx - 1]
             delta = val - prev_v
             consumed = -delta
-            # значение — из существующей палитры
-            val_color = COLOR_TEXT_MUTED
-            consumed_lines.append((label, color, fmt_axis(consumed), val_color))
+            if consumed > 0:
+                val_color = "#e88a8a"
+                consumed_text = f"-{fmt_axis(consumed)}"
+            else:
+                val_color = "#6bcb77"
+                consumed_text = f"+{fmt_axis(-consumed)}"
+            consumed_lines.append((label, color, consumed_text, val_color))
 
     if consumed_lines:
         tip_lines.append(("sep", "", ""))
