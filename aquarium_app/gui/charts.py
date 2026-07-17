@@ -795,24 +795,36 @@ def on_chart_hover(canvas, event):
     tx = x + 8
     if tx + text_w > w:
         tx = max(0, x - text_w - 8)
-    ty = 2
+    # позиционирование по Y: пытаемся показать снизу от курсора
+    ty = event.y + 12
     if ty + box_h > h:
-        ty = max(0, h - box_h - 2)
+        # не влезает снизу — показываем сверху от курсора
+        ty = event.y - box_h - 8
+    if ty < 0:
+        ty = 0
+    # если всё равно не влезает — обрезаем по высоте канваса
+    if ty + box_h > h:
+        box_h = h - ty
     canvas.create_rectangle(tx, ty, tx + text_w, ty + box_h,
                              fill="#05060a", outline=COLOR_BORDER, tags="hover")
     # левый отступ для текста (центрируем по самой длинной строке)
     pad_l = (text_w - max_tw) // 2
+    # начальная Y — с учётом обрезки сверху
     cur_y = ty + 7
+    bottom_limit = ty + box_h - 4  # не рисовать ниже этого
     canvas.create_text(tx + pad_l, cur_y, anchor="w", text=date_str,
                         fill=COLOR_TEXT_MUTED, font=(ff, 7), tags="hover")
     cur_y += line_h
     for _lbl, text, color in tip_lines:
         if _lbl == "sep":
             # тонкая линия-разделитель
-            canvas.create_line(tx + 6, cur_y - 1, tx + text_w - 6, cur_y - 1,
-                               fill=COLOR_BORDER, dash=(2, 2), tags="hover")
+            if cur_y + 2 < bottom_limit:
+                canvas.create_line(tx + 6, cur_y - 1, tx + text_w - 6, cur_y - 1,
+                                   fill=COLOR_BORDER, dash=(2, 2), tags="hover")
             cur_y += 4
             continue
+        if cur_y + line_h > bottom_limit:
+            break  # не влезает — прекращаем
         fnt = (ff, 8, "bold") if _lbl in ("delta", "dose_hdr") else (ff, 8)
         canvas.create_text(tx + pad_l, cur_y, anchor="w",
                             text=text,
