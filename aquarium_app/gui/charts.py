@@ -714,8 +714,8 @@ def on_chart_hover(canvas, event):
             prev_d, prev_v = hist[cur_idx - 1]
             delta = val - prev_v
             consumed = -delta
-            # цвет значения: мягкий зеленоватый если выросли, мягкий красноватый если упали
-            val_color = "#8cce8c" if delta > 0 else "#e88a8a"
+            # единый приглушённый цвет значения
+            val_color = COLOR_TEXT_SOFT
             consumed_lines.append((label, color, fmt_axis(consumed), val_color))
 
     if consumed_lines:
@@ -782,14 +782,14 @@ def on_chart_hover(canvas, event):
             tk.Frame(sep_f, bg=COLOR_BORDER, height=1).pack(fill="x", pady=(1, 0))
             continue
         if item[0] == "cons_split":
-            # два цвета: элемент своим цветом, значение зелёным/красным
+            # элемент своим цветом, значение нейтральным
             _label, elem_color, consumed_text, val_color = item[1], item[2], item[3], item[4]
             row_f = tk.Frame(pad_frame, bg="#05060a")
             row_f.pack(fill="x")
-            tk.Label(row_f, text=f"  {_label}: ", bg="#05060a", fg=elem_color,
+            tk.Label(row_f, text=f"{_label}: ", bg="#05060a", fg=elem_color,
                      font=(ff, 8), anchor="w", pady=0).pack(side="left")
             tk.Label(row_f, text=consumed_text, bg="#05060a", fg=val_color,
-                     font=(ff, 8, "bold"), anchor="w", pady=0).pack(side="left")
+                     font=(ff, 8), anchor="w", pady=0).pack(side="left")
             continue
         _lbl, text, color = item[0], item[1], item[2]
         is_bold = _lbl in ("dose_hdr", "cons_hdr")
