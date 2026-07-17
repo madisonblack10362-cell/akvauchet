@@ -77,7 +77,7 @@ class ReadingsTab:
                               highlightbackground=COLOR_BORDER, highlightthickness=1)
         chart_card.pack(fill="x", padx=12, pady=4)
         self.readings_trend_canvas = tk.Canvas(chart_card, bg=COLOR_CARD,
-                                               height=120, highlightthickness=0)
+                                               height=140, highlightthickness=0)
         self.readings_trend_canvas.pack(fill="x", padx=2, pady=2)
 
         # --- форма добавления ---
@@ -593,10 +593,35 @@ class ReadingsTab:
                 result.append((r["date"], r["val"]))
             return result
 
+        # подмены воды для графика
+        wc_rows = self.conn.execute(
+            "SELECT date, water_change_pct, water_change_l FROM readings "
+            "WHERE aquarium_id=? AND (water_change_pct IS NOT NULL OR water_change_l IS NOT NULL) "
+            "ORDER BY date ASC", (aq_id,)
+        ).fetchall()
+        wc_events = []
+        for r in wc_rows:
+            if days is not None:
+                try:
+                    rd = dt.date.fromisoformat(r["date"])
+                    if rd < dt.date.today() - dt.timedelta(days=days):
+                        continue
+                except Exception:
+                    pass
+            pct = r["water_change_pct"]
+            if pct is None and r["water_change_l"] is not None:
+                aq = get_aquarium(self.conn, aq_id)
+                vol = aq["volume_l"] if aq else 0
+                if vol:
+                    pct = round(r["water_change_l"] / vol * 100, 1)
+            if pct is not None:
+                wc_events.append((r["date"], pct))
+
         draw_param_trend_chart(
             c, self.conn, aq_id, param_defs,
             days=days, since_iso=since_iso,
             history_fn=history_fn,
             font_family=self.FF,
             empty_message="недостаточно данных для графика",
+            wc_events=wc_events if wc_events else None,
         )

@@ -159,6 +159,7 @@ def draw_param_trend_chart(
     font_family="Segoe UI",
     empty_message="недостаточно данных для графика",
     target_ranges=None,
+    wc_events=None,
 ):
     """Обобщённая отрисовка графика динамики нескольких параметров.
 
@@ -305,8 +306,31 @@ def draw_param_trend_chart(
         canvas.create_text(label_x, last_y, anchor="w", text=label,
                            fill=color, font=(font_family, 8, "bold"))
 
+    # ---- полоса подмен воды ----
+    wc_strip_h = 14
+    wc_strip_top = h - wc_strip_h - pad_b
+    wc_strip_bot = h - pad_b
+    if wc_events:
+        # фоновая полоса
+        canvas.create_rectangle(pad_l, wc_strip_top, pad_l + plot_w, wc_strip_bot,
+                                 fill="#0d2b1a", outline="#1a4a2e", width=1)
+        max_pct = max((pct for _, pct in wc_events), default=0) or 1
+        bar_w = max(3, min(8, plot_w / max(span_days, 7) * 0.6))
+        for date_iso, pct in wc_events:
+            x = x_for_date(date_iso)
+            bar_h = (pct / max_pct) * (wc_strip_h - 4)
+            x0 = x - bar_w / 2
+            x1 = x + bar_w / 2
+            canvas.create_rectangle(x0, wc_strip_bot - bar_h - 1, x1, wc_strip_bot - 1,
+                                     fill="#20c997", outline="")
+            if bar_w >= 5:
+                canvas.create_text(x, wc_strip_bot - bar_h - 5, anchor="s",
+                                   text=f"{pct:.0f}%", fill="#20c997",
+                                   font=(font_family, 6))
+        canvas.create_text(pad_l - 4, (wc_strip_top + wc_strip_bot) / 2, anchor="e",
+                           text="подмена", fill="#20c997", font=(font_family, 6))
     # ---- подписи оси X (даты начала и конца периода) ----
-    axis_y = h - 2
+    axis_y = wc_strip_top - 2 if wc_events else h - 2
     canvas.create_text(pad_l, axis_y, anchor="sw", text=period_start.strftime("%d.%m"),
                        fill=COLOR_TEXT_MUTED, font=(font_family, 7))
     canvas.create_text(pad_l + plot_w, axis_y, anchor="se", text=period_end.strftime("%d.%m"),
