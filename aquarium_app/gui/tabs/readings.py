@@ -15,7 +15,7 @@ from aquarium_app.config import (
 from aquarium_app.db import (
     get_readings, get_readings_by_date, add_reading, delete_reading,
     get_reading, update_reading, get_aquarium,
-    get_dosing_filtered,
+    get_dosing_filtered, get_targets,
 )
 from aquarium_app.logic.calculations import out_of_range_flags
 from aquarium_app.logic.formatters import from_iso, to_iso, today_str, parse_float
@@ -664,6 +664,7 @@ class ReadingsTab:
             history_fn=history_fn,
             font_family=self.FF,
             empty_message="недостаточно данных для графика",
+            target_ranges=get_targets(self.conn, aq_id) if aq_id else None,
             wc_events=wc_events if wc_events else None,
             dose_events=dose_events if dose_events else None,
         )

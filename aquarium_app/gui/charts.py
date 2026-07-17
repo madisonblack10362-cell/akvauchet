@@ -303,7 +303,7 @@ def draw_param_trend_chart(
             points.append((x, y))
             hover_points.append({"x": x, "y": y, "date": date_iso, "value": v,
                                   "label": label, "color": color,
-                                  "_is_wc": key == "_wc"})
+                                  "_key": key, "_is_wc": key == "_wc"})
 
         for i in range(len(points) - 1):
             canvas.create_line(points[i][0], points[i][1],
@@ -337,6 +337,12 @@ def draw_param_trend_chart(
     # все метки чтобы показывать 0 для отсутствующих в конкретный день
     canvas._hover_all_labels = [(color, label) for _key, color, label, _hist in strips if _key != "_wc"]
     canvas._dose_events = dose_events or {}
+    # доп. данные для обогащённых подсказок
+    canvas._param_hist = {key: list(hist) for key, _c, _l, hist in strips if key != "_wc"}
+    canvas._target_ranges = target_ranges or {}
+    # даты подмен и дозировок (для счётчика «дней от …»)
+    canvas._wc_dates_set = set(d for d, _ in (wc_events or []))
+    canvas._dose_dates_set = set(dose_events.keys()) if dose_events else set()
     canvas.bind("<Motion>", lambda e, c=canvas: on_chart_hover(c, e))
     canvas.bind("<Leave>", lambda e, c=canvas: on_chart_leave(c))
 
@@ -633,6 +639,46 @@ def on_chart_hover(canvas, event):
     for p in same_x:
         canvas.create_oval(p["x"] - 4, p["y"] - 4, p["x"] + 4, p["y"] + 4,
                             outline="#ffffff", width=1.5, fill=p["color"], tags="hover")
+
+    # --- подготовка данных для обогащённых подсказок ---
+    raw_date = nearest["date"]
+    try:
+        hover_date = dt.date.fromisoformat(raw_date) if isinstance(raw_date, str) else raw_date
+    except Exception:
+        hover_date = None
+    hover_iso = raw_date if isinstance(raw_date, str) else raw_date.isoformat()
+
+    param_hist = getattr(canvas, "_param_hist", {})   # {key: [(date_iso, value), ...]}
+    target_ranges = getattr(canvas, "_target_ranges", {})  # {key: (min, max)}
+    wc_dates_set = getattr(canvas, "_wc_dates_set", set())
+    dose_dates_set = getattr(canvas, "_dose_dates_set", set())
+    # label → key маппинг (из strips: key=po4 → label=PO4)
+    label_to_key = {}
+    for p in points:
+        label_to_key[p["label"]] = p.get("_key", "")
+
+    # --- счётчики «дней от …» ---
+    meta_lines = []  # (text, color) — информационные строки после значений
+    if hover_date:
+        # дней от последней подмены
+        prev_wc = [d for d in wc_dates_set if d < hover_iso]
+        if prev_wc:
+            try:
+                last_wc = max(dt.date.fromisoformat(d) for d in prev_wc)
+                days_wc = (hover_date - last_wc).days
+                meta_lines.append((f"Подмена: {days_wc} дн. назад", "#20c997"))
+            except Exception:
+                pass
+        # дней от последнего внесения
+        prev_dose = [d for d in dose_dates_set if d < hover_iso]
+        if prev_dose:
+            try:
+                last_dose = max(dt.date.fromisoformat(d) for d in prev_dose)
+                days_dose = (hover_date - last_dose).days
+                meta_lines.append((f"Дозирование: {days_dose} дн. назад", "#fcc419"))
+            except Exception:
+                pass
+
     # собираем tooltip: для каждого элемента ищем ближайшую точку слева (<= x)
     all_labels = getattr(canvas, "_hover_all_labels", [])
     tip_lines = []
@@ -655,6 +701,55 @@ def on_chart_hover(canvas, event):
                     tip_lines.append((label, f'{label}: {fmt_axis(closest["value"])}', color))
                 else:
                     tip_lines.append((label, f"{label}: 0", color))
+
+    # --- дельта и расход/день для параметров с реальной точкой на этой дате ---
+    for color, label in all_labels:
+        matched = [p for p in same_x if p["label"] == label]
+        if not matched:
+            continue
+        p = matched[0]
+        val = p["value"]
+        # ищем key по label через points
+        pkey = ""
+        for pp in points:
+            if pp["label"] == label:
+                pkey = pp.get("_key", "")
+                break
+        if not pkey or pkey not in param_hist:
+            continue
+        hist = param_hist[pkey]
+        # индекс текущей точки в истории
+        cur_idx = None
+        for i, (d, v) in enumerate(hist):
+            if d == hover_iso and v == val:
+                cur_idx = i
+                break
+        if cur_idx is None:
+            continue
+        # --- дельта от предыдущего замера ---
+        if cur_idx > 0:
+            prev_d, prev_v = hist[cur_idx - 1]
+            delta = val - prev_v
+            arrow = "+" if delta > 0 else ""
+            delta_str = f"{arrow}{fmt_axis(delta)}"
+            delta_color = "#ff6b6b" if delta > 0 else "#51cf66"
+            tip_lines.append(("delta", f"  {delta_str}", delta_color))
+            # --- расход в день ---
+            try:
+                d_cur = dt.date.fromisoformat(hover_iso)
+                d_prev = dt.date.fromisoformat(prev_d)
+                days_diff = (d_cur - d_prev).days
+                if days_diff > 0:
+                    daily = -delta / days_diff  # расход = падение / дни
+                    tip_lines.append(("rate", f"  ~{fmt_axis(daily)}/день", COLOR_TEXT_MUTED))
+            except Exception:
+                pass
+        # --- целевой диапазон ---
+        if pkey in target_ranges:
+            t_min, t_max = target_ranges[pkey]
+            if t_min is not None and t_max is not None:
+                tip_lines.append(("target", f"  норма: {fmt_axis(t_min)}-{fmt_axis(t_max)}", "#4dabf7"))
+
     # подмена — отдельно, без carry-forward
     wc_matched = [p for p in same_x if p.get("_is_wc")]
     if wc_matched:
@@ -664,17 +759,19 @@ def on_chart_hover(canvas, event):
     dose_map = getattr(canvas, "_dose_events", {})
     dose_list = []
     if dose_map:
-        raw = nearest["date"]
-        d_key = raw if isinstance(raw, str) else raw.isoformat()
+        d_key = hover_iso
         dose_list = dose_map.get(d_key, [])
-    if dose_list:
-        # разделитель перед блоком удобрений
+    if dose_list or meta_lines:
+        # разделитель перед блоком доп. инфо
         tip_lines.append(("sep", "", ""))
-        tip_lines.append(("dose_hdr", "Внесено удобрений:", "#fcc419"))
-        for entry in dose_list:
-            tip_lines.append(("dose", entry, "#fcc419"))
+        # «дней от подмены/дозирования»
+        for txt, clr in meta_lines:
+            tip_lines.append(("meta", txt, clr))
+        if dose_list:
+            tip_lines.append(("dose_hdr", "Внесено удобрений:", "#fcc419"))
+            for entry in dose_list:
+                tip_lines.append(("dose", entry, "#fcc419"))
     # текст подсказки
-    raw_date = nearest["date"]
     if isinstance(raw_date, dt.date):
         date_str = raw_date.strftime("%d.%m.%Y")
     else:
@@ -690,7 +787,9 @@ def on_chart_hover(canvas, event):
     max_tw = 0
     for t in [date_str] + vis_lines:
         canvas.itemconfig(tmp, text=t)
-        max_tw = max(max_tw, canvas.bbox(tmp)[2] - canvas.bbox(tmp)[0])
+        bb = canvas.bbox(tmp)
+        if bb:
+            max_tw = max(max_tw, bb[2] - bb[0])
     canvas.delete(tmp)
     text_w = max_tw + 18
     tx = x + 8
@@ -714,9 +813,10 @@ def on_chart_hover(canvas, event):
                                fill=COLOR_BORDER, dash=(2, 2), tags="hover")
             cur_y += 4
             continue
+        fnt = (ff, 8, "bold") if _lbl in ("delta", "dose_hdr") else (ff, 8)
         canvas.create_text(tx + pad_l, cur_y, anchor="w",
                             text=text,
-                            fill=color, font=(ff, 8, "bold"), tags="hover")
+                            fill=color, font=fnt, tags="hover")
         cur_y += line_h
 
 
