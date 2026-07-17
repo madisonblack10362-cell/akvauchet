@@ -139,7 +139,7 @@ class DosingTab:
 
         tk.Label(row1, text="Доза (мл):", font=(FF, 9), bg=COLOR_CARD,
                  fg=COLOR_TEXT_SOFT).pack(side="left")
-        self.dose_spin = SpinEntry(row1, width=7, step=0.5, default="1.0",
+        self.dose_spin = SpinEntry(row1, width=7, step=0.1, default="1.0",
                                     font_family=FF)
         self.dose_spin.pack(side="left", padx=(2, 0))
         self.dose_spin.var.trace_add("write", lambda *_: self._update_dose_preview())
@@ -533,7 +533,7 @@ class DosingTab:
         row_dose.pack(fill="x", **pad)
         tk.Label(row_dose, text="Доза (мл):", font=(FF, 10), width=14, anchor="w",
                  bg=COLOR_BG, fg=COLOR_TEXT_SOFT).pack(side="left")
-        dose_spin = SpinEntry(row_dose, width=10, step=0.5, font_family=FF,
+        dose_spin = SpinEntry(row_dose, width=10, step=0.1, font_family=FF,
                                default=f"{entry['dose']:g}" if entry else "1.0")
         dose_spin.pack(side="left", padx=(2, 0))
 

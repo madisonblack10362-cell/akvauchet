@@ -142,21 +142,25 @@ class ReadingsTab:
         ttk.Entry(row_cmt, textvariable=self.read_comment_var, width=50).pack(
             side="left", fill="x", expand=True)
 
-        # кнопки
+        # кнопки формы
         row_btns = tk.Frame(form_inner, bg=COLOR_CARD)
         row_btns.pack(fill="x", pady=(6, 2))
         tk.Button(row_btns, text="Добавить", font=(FF, 10, "bold"),
                   bg=COLOR_ACCENT, fg="#151515", activebackground=COLOR_ACCENT,
                   relief="flat", padx=16, pady=4, cursor="hand2",
                   command=self.add_reading_entry).pack(side="left")
-        tk.Button(row_btns, text="Изменить выбранное", font=(FF, 9),
+
+        # кнопки таблицы — отдельный ряд, всегда видны
+        table_btns = tk.Frame(parent, bg=COLOR_BG)
+        table_btns.pack(fill="x", padx=12, pady=(2, 0))
+        tk.Button(table_btns, text="Изменить выбранное", font=(FF, 9),
                   bg=COLOR_CARD, fg=COLOR_TEXT, activebackground=COLOR_ALT_ROW,
                   relief="flat", padx=10, pady=4, cursor="hand2",
-                  command=self.edit_reading_entry).pack(side="left", padx=(8, 0))
-        tk.Button(row_btns, text="Удалить выбранное", font=(FF, 9),
+                  command=self.edit_reading_entry).pack(side="left")
+        tk.Button(table_btns, text="Удалить выбранное", font=(FF, 9),
                   bg=COLOR_CARD, fg=COLOR_WARN_TEXT, activebackground=COLOR_ALT_ROW,
                   relief="flat", padx=10, pady=4, cursor="hand2",
-                  command=self.delete_reading_selected).pack(side="right")
+                  command=self.delete_reading_selected).pack(side="left", padx=(8, 0))
 
         # --- таблица ---
         table_card = tk.Frame(parent, bg=COLOR_CARD, bd=1, relief="solid",
