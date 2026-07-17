@@ -637,6 +637,22 @@ class ReadingsTab:
         else:
             date_from = None
         dose_rows = get_dosing_filtered(self.conn, aq_id, date_from=date_from)
+        # Сортировка: Фосфат(1) → Нитрат(2) → Калий(3) → Микро(4)
+        def _fk(row):
+            po4 = row["f_po4"] or 0
+            no3 = row["f_no3"] or 0
+            k = row["f_k"] or 0
+            fe = row["f_fe"] or 0
+            if po4 > 0 and no3 == 0:
+                return 1
+            if no3 > 0:
+                return 2
+            if k > 0 and po4 == 0 and no3 == 0:
+                return 3
+            if fe > 0:
+                return 4
+            return 5
+        dose_rows = sorted(dose_rows, key=_fk)
         for r in dose_rows:
             dose_events.setdefault(r["date"], []).append(
                 f'{r["fert_name"]} {r["dose"]} мл'
