@@ -714,22 +714,22 @@ def on_chart_hover(canvas, event):
             prev_d, prev_v = hist[cur_idx - 1]
             delta = val - prev_v
             consumed = -delta
-            # единый приглушённый цвет значения
-            val_color = COLOR_TEXT_SOFT
+            # значение в холодном приглушённом тоне (блок 2)
+            val_color = "#8a9aab"
             consumed_lines.append((label, color, fmt_axis(consumed), val_color))
 
     if consumed_lines:
         tip_lines.append(("sep", "", ""))
-        tip_lines.append(("cons_hdr", "Израсходовано:", COLOR_TEXT_MUTED))
+        tip_lines.append(("cons_hdr", "Израсходовано:", "#6e7386"))
         for _label, elem_color, consumed_text, val_color in consumed_lines:
             tip_lines.append(("cons_split", _label, elem_color, consumed_text, val_color))
 
     # ===== БЛОК 3: Внесено удобрений =====
     if dose_list:
         tip_lines.append(("sep", "", ""))
-        tip_lines.append(("dose_hdr", "Внесено удобрений:", COLOR_TEXT_MUTED))
+        tip_lines.append(("dose_hdr", "Внесено удобрений:", "#6e7386"))
         for entry in dose_list:
-            tip_lines.append(("dose", entry, "#fcc419"))
+            tip_lines.append(("dose", entry, "#a09888"))
 
     # ===== БЛОК 4: Последняя подмена =====
     if hover_date:
