@@ -728,7 +728,7 @@ def on_chart_hover(canvas, event):
         tip_lines.append(("sep", "", ""))
         tip_lines.append(("dose_hdr", "Внесено удобрений:", COLOR_TEXT_MUTED))
         for entry in dose_list:
-            tip_lines.append(("dose", entry, "#8a8e9a"))
+            tip_lines.append(("dose", entry, "#fcc419"))
 
     # ===== БЛОК 4: Последняя подмена =====
     if hover_date:
