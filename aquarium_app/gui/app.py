@@ -427,21 +427,12 @@ class App(
                     "AquaUchet.AquariumApp.1")
             except (AttributeError, OSError):
                 pass
-        # порядок поиска: рядом с .exe > внутри бандла (PyInstaller) > resources
-        search_dirs = [RESOURCES_DIR]
+        # при frozen — иконка уже вшита в .exe через --icon, не трогаем
         if getattr(sys, "frozen", False):
-            exe_dir = os.path.dirname(os.path.abspath(sys.executable))
-            search_dirs.insert(0, exe_dir)
-        icon_path_ico = None
-        icon_path_png = None
-        for d in search_dirs:
-            candidate = os.path.join(d, "aquarium_app.ico")
-            if os.path.exists(candidate):
-                icon_path_ico = candidate
-                break
-            candidate = os.path.join(d, "icon.png")
-            if os.path.exists(candidate) and icon_path_png is None:
-                icon_path_png = candidate
+            return
+        # для разработки — ищем иконку рядом
+        icon_path_ico = os.path.join(RESOURCES_DIR, "aquarium_app.ico")
+        icon_path_png = os.path.join(RESOURCES_DIR, "icon.png")
         self._icon_photo = None
         if os.path.exists(icon_path_ico):
             try:
@@ -449,7 +440,7 @@ class App(
                 return
             except tk.TclError:
                 pass
-        if icon_path_png and os.path.exists(icon_path_png):
+        if os.path.exists(icon_path_png):
             try:
                 self._icon_photo = tk.PhotoImage(file=icon_path_png)
                 self.iconphoto(True, self._icon_photo)
