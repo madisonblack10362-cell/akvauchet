@@ -14,6 +14,7 @@ from aquarium_app.config import (
 from aquarium_app.db import (
     get_readings, get_readings_by_date, add_reading, delete_reading,
     get_reading, update_reading, get_aquarium,
+    get_dosing_filtered,
 )
 from aquarium_app.logic.calculations import out_of_range_flags
 from aquarium_app.logic.formatters import from_iso, to_iso, today_str, parse_float
@@ -617,6 +618,20 @@ class ReadingsTab:
             if pct is not None:
                 wc_events.append((r["date"], pct))
 
+        # дозировки для подсказок на графике
+        dose_events = {}
+        if days is not None:
+            date_from = (dt.date.today() - dt.timedelta(days=days)).isoformat()
+        elif since_iso:
+            date_from = since_iso
+        else:
+            date_from = None
+        dose_rows = get_dosing_filtered(self.conn, aq_id, date_from=date_from)
+        for r in dose_rows:
+            dose_events.setdefault(r["date"], []).append(
+                f'{r["fert_name"]} {r["dose"]} мл'
+            )
+
         draw_param_trend_chart(
             c, self.conn, aq_id, param_defs,
             days=days, since_iso=since_iso,
@@ -624,4 +639,5 @@ class ReadingsTab:
             font_family=self.FF,
             empty_message="недостаточно данных для графика",
             wc_events=wc_events if wc_events else None,
+            dose_events=dose_events if dose_events else None,
         )

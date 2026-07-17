@@ -160,6 +160,7 @@ def draw_param_trend_chart(
     empty_message="недостаточно данных для графика",
     target_ranges=None,
     wc_events=None,
+    dose_events=None,
 ):
     """Обобщённая отрисовка графика динамики нескольких параметров.
 
@@ -335,6 +336,7 @@ def draw_param_trend_chart(
     canvas._hover_type = "trend"
     # все метки чтобы показывать 0 для отсутствующих в конкретный день
     canvas._hover_all_labels = [(color, label) for _key, color, label, _hist in strips if _key != "_wc"]
+    canvas._dose_events = dose_events or {}
     canvas.bind("<Motion>", lambda e, c=canvas: on_chart_hover(c, e))
     canvas.bind("<Leave>", lambda e, c=canvas: on_chart_leave(c))
 
@@ -658,6 +660,16 @@ def on_chart_hover(canvas, event):
     if wc_matched:
         p = wc_matched[0]
         tip_lines.append(("wc", f'Подмена: {p["value"]:.1f}%', "#20c997"))
+    # дозировки — из предзагруженных данных
+    dose_map = getattr(canvas, "_dose_events", {})
+    if dose_map:
+        raw = nearest["date"]
+        d_key = raw if isinstance(raw, str) else raw.isoformat()
+        dose_list = dose_map.get(d_key, [])
+        if dose_list:
+            tip_lines.append(("dose_hdr", "Удобрения:", "#fcc419"))
+            for entry in dose_list:
+                tip_lines.append(("dose", f"  {entry}", "#fcc419"))
     # текст подсказки
     raw_date = nearest["date"]
     if isinstance(raw_date, dt.date):
