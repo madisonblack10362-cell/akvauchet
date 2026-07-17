@@ -207,14 +207,8 @@ def draw_param_trend_chart(
         if len(hist) >= 2:
             strips.append((key, color, label, hist))
 
-    # подмена воды — отдельная полоса как остальные параметры
-    wc_color = "#20c997"
-    wc_label = "Подмена"
-    wc_hist = []
-    if wc_events:
-        wc_hist = [(d, pct) for d, pct in wc_events]
-        if len(wc_hist) >= 1:
-            strips.append(("_wc", wc_color, wc_label, wc_hist))
+    # данные подмены — только для тултипа (дни от последней подмены),
+    # НЕ рисуем отдельной полосой на графике
 
     if not strips:
         canvas.create_text(w // 2, h // 2, text=empty_message,
@@ -719,8 +713,8 @@ def on_chart_hover(canvas, event):
             prev_d, prev_v = hist[cur_idx - 1]
             delta = val - prev_v
             consumed = -delta
-            # зелёный если показания выросли, красный если упали
-            val_color = "#51cf66" if delta > 0 else "#ff6b6b"
+            # цвет значения: мягкий зеленоватый если выросли, мягкий красноватый если упали
+            val_color = "#8cce8c" if delta > 0 else "#e88a8a"
             consumed_lines.append((label, color, fmt_axis(consumed), val_color))
 
     if consumed_lines:
@@ -732,9 +726,9 @@ def on_chart_hover(canvas, event):
     # ===== БЛОК 3: Внесено удобрений =====
     if dose_list:
         tip_lines.append(("sep", "", ""))
-        tip_lines.append(("dose_hdr", "Внесено удобрений:", "#fcc419"))
+        tip_lines.append(("dose_hdr", "Внесено удобрений:", COLOR_TEXT_MUTED))
         for entry in dose_list:
-            tip_lines.append(("dose", entry, "#fcc419"))
+            tip_lines.append(("dose", entry, "#8a8e9a"))
 
     # ===== БЛОК 4: Последняя подмена =====
     if hover_date:
