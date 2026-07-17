@@ -672,37 +672,25 @@ def on_chart_hover(canvas, event):
 
     tip_lines = []
 
-    # ===== БЛОК 1: Внесено удобрений (сверху) =====
-    if dose_list:
-        tip_lines.append(("dose_hdr", "Внесено удобрений:", "#fcc419"))
-        for entry in dose_list:
-            tip_lines.append(("dose", entry, "#fcc419"))
-
-    # ===== РАЗДЕЛИТЕЛЬ =====
-    # (ставим если есть что-то до и после)
-    has_block1 = bool(dose_list)
-    # блоки 2 и 3 будут ниже — разделитель добавим после построения
-
-    # ===== БЛОК 2: Значения параметров + расход по элементу =====
+    # ===== БЛОК 1: Показания параметров + расход =====
     all_labels = getattr(canvas, "_hover_all_labels", [])
-    param_block = []
     for color, label in all_labels:
         matched = [p for p in same_x if p["label"] == label]
         if matched:
             p = matched[0]
-            param_block.append(("val", f'{label}: {fmt_axis(p["value"])}', color))
+            tip_lines.append(("val", f'{label}: {fmt_axis(p["value"])}', color))
         else:
             left_points = [p for p in points if p["label"] == label and p["x"] <= x]
             if left_points:
                 closest = max(left_points, key=lambda p: p["x"])
-                param_block.append(("val", f'{label}: {fmt_axis(closest["value"])}', color))
+                tip_lines.append(("val", f'{label}: {fmt_axis(closest["value"])}', color))
             else:
                 right_points = [p for p in points if p["label"] == label and p["x"] > x]
                 if right_points:
                     closest = min(right_points, key=lambda p: p["x"])
-                    param_block.append(("val", f'{label}: {fmt_axis(closest["value"])}', color))
+                    tip_lines.append(("val", f'{label}: {fmt_axis(closest["value"])}', color))
                 else:
-                    param_block.append(("val", f"{label}: 0", color))
+                    tip_lines.append(("val", f"{label}: 0", color))
 
         # --- расход по элементу: съели X, ~Y/день ---
         real_matched = [p for p in same_x if p["label"] == label]
@@ -720,7 +708,6 @@ def on_chart_hover(canvas, event):
                 if cur_idx is not None and cur_idx > 0:
                     prev_d, prev_v = hist[cur_idx - 1]
                     delta = val - prev_v
-                    # расход = сколько упало (отрицательная дельта = съели)
                     consumed = -delta
                     try:
                         d_cur = dt.date.fromisoformat(hover_iso)
@@ -728,39 +715,37 @@ def on_chart_hover(canvas, event):
                         days_diff = (d_cur - d_prev).days
                         if days_diff > 0:
                             daily = consumed / days_diff
-                            param_block.append(("rate", f"  съели {fmt_axis(consumed)}, ~{fmt_axis(daily)}/день", COLOR_TEXT_MUTED))
+                            tip_lines.append(("rate", f"  съели {fmt_axis(consumed)}, ~{fmt_axis(daily)}/день", COLOR_TEXT_MUTED))
                         else:
-                            param_block.append(("rate", f"  съели {fmt_axis(consumed)}", COLOR_TEXT_MUTED))
+                            tip_lines.append(("rate", f"  съели {fmt_axis(consumed)}", COLOR_TEXT_MUTED))
                     except Exception:
-                        param_block.append(("rate", f"  съели {fmt_axis(consumed)}", COLOR_TEXT_MUTED))
+                        tip_lines.append(("rate", f"  съели {fmt_axis(consumed)}", COLOR_TEXT_MUTED))
 
-    # подмена — в блоке параметров
+    # подмена
     wc_matched = [p for p in same_x if p.get("_is_wc")]
     if wc_matched:
         p = wc_matched[0]
-        param_block.append(("wc", f'Подмена: {p["value"]:.1f}%', "#20c997"))
+        tip_lines.append(("wc", f'Подмена: {p["value"]:.1f}%', "#20c997"))
 
-    # собираем всё вместе с разделителями
-    if has_block1 and param_block:
+    # ===== РАЗДЕЛИТЕЛЬ + БЛОК 2: Внесено удобрений + дозирование =====
+    if dose_list or (hover_date and dose_dates_set):
         tip_lines.append(("sep", "", ""))
-    tip_lines.extend(param_block)
-
-    # ===== БЛОК 3: Дозирование: X дн. назад =====
-    if hover_date:
-        prev_dose = [d for d in dose_dates_set if d <= hover_iso]
-        if prev_dose:
-            try:
-                last_dose = max(dt.date.fromisoformat(d) for d in prev_dose)
-                days_dose = (hover_date - last_dose).days
-                if days_dose == 0:
-                    dose_info = "Дозирование: сегодня"
-                else:
-                    dose_info = f"Дозирование: {days_dose} дн. назад"
-                if tip_lines:
-                    tip_lines.append(("sep", "", ""))
-                tip_lines.append(("meta", dose_info, "#fcc419"))
-            except Exception:
-                pass
+        if dose_list:
+            tip_lines.append(("dose_hdr", "Внесено удобрений:", "#fcc419"))
+            for entry in dose_list:
+                tip_lines.append(("dose", entry, "#fcc419"))
+        if hover_date:
+            prev_dose = [d for d in dose_dates_set if d <= hover_iso]
+            if prev_dose:
+                try:
+                    last_dose = max(dt.date.fromisoformat(d) for d in prev_dose)
+                    days_dose = (hover_date - last_dose).days
+                    if days_dose == 0:
+                        tip_lines.append(("meta", "Дозирование: сегодня", "#fcc419"))
+                    else:
+                        tip_lines.append(("meta", f"Дозирование: {days_dose} дн. назад", "#fcc419"))
+                except Exception:
+                    pass
 
     # --- дата ---
     if isinstance(raw_date, dt.date):
