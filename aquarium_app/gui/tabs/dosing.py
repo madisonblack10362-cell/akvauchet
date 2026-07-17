@@ -61,7 +61,7 @@ class DosingTab:
         self.dose_aq_combo.bind("<<ComboboxSelected>>", lambda e: self.refresh_dosing_table())
 
         # компактные фильтры периода
-        self._dose_filter = "30d"
+        self._dose_filter = "7d"
         filter_data = [("7d", "7 дн"), ("30d", "30 дн"), ("90d", "90 дн"), ("all", "Всё")]
         self.dose_filter_btns = {}
         for key, label in filter_data:
@@ -94,9 +94,9 @@ class DosingTab:
                  bg=COLOR_CARD, fg=COLOR_ACCENT).pack(side="left")
 
         # режим графика
-        self._dosing_trend_mode = "cumulative"
+        self._dosing_trend_mode = "daily"
         self.dosing_trend_mode_btns = {}
-        for key, label in [("cumulative", "Нарастающий"), ("daily", "По дням")]:
+        for key, label in [("daily", "По дням"), ("cumulative", "Нарастающий")]:
             b = tk.Button(chart_bar, text=label, font=(FF, 8), relief="flat",
                           bg=COLOR_ALT_ROW, fg=COLOR_TEXT_MUTED, borderwidth=0,
                           padx=6, pady=1, cursor="hand2",
@@ -104,7 +104,7 @@ class DosingTab:
             b.pack(side="left", padx=(8, 1))
             self.dosing_trend_mode_btns[key] = b
 
-        self._dosing_trend_filter = "30d"
+        self._dosing_trend_filter = "7d"
         self.dosing_trend_filter_btns = {}
         for key, label in [("7d", "7д"), ("30d", "30д"), ("90d", "90д"), ("all", "Всё")]:
             b = tk.Button(chart_bar, text=label, font=(FF, 8), relief="flat",
