@@ -148,6 +148,10 @@ class ReadingsTab:
                   bg=COLOR_ACCENT, fg="#151515", activebackground=COLOR_ACCENT,
                   relief="flat", padx=16, pady=4, cursor="hand2",
                   command=self.add_reading_entry).pack(side="left")
+        tk.Button(row_btns, text="Изменить выбранное", font=(FF, 9),
+                  bg=COLOR_CARD, fg=COLOR_TEXT, activebackground=COLOR_ALT_ROW,
+                  relief="flat", padx=10, pady=4, cursor="hand2",
+                  command=self.edit_reading_entry).pack(side="left", padx=(8, 0))
         tk.Button(row_btns, text="Удалить выбранное", font=(FF, 9),
                   bg=COLOR_CARD, fg=COLOR_WARN_TEXT, activebackground=COLOR_ALT_ROW,
                   relief="flat", padx=10, pady=4, cursor="hand2",
