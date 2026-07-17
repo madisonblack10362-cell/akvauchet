@@ -66,7 +66,8 @@ def get_journal_data(conn: sqlite3.Connection, aq_id: int,
 
     dosing_rows = conn.execute(f"""
         SELECT d.id, d.date, d.fert_id, d.dose, d.comment,
-               f.name AS fert_name
+               f.name AS fert_name, f.po4 AS fert_po4, f.no3 AS fert_no3,
+               f.k AS fert_k, f.fe AS fert_fe
         FROM dosing d
         JOIN fertilizers f ON d.fert_id = f.id
         WHERE {where_sql}
@@ -102,7 +103,30 @@ def get_journal_data(conn: sqlite3.Connection, aq_id: int,
             "fert_name": r["fert_name"],
             "dose": r["dose"],
             "comment": r["comment"],
+            "fert_po4": r["fert_po4"],
+            "fert_no3": r["fert_no3"],
+            "fert_k": r["fert_k"],
+            "fert_fe": r["fert_fe"],
         })
+
+    # Ключ сортировки: PO4(1) → NO3(2) → K(3) → микро(4)
+    def _fert_sort_key(item):
+        po4 = item.get("fert_po4", 0) or 0
+        no3 = item.get("fert_no3", 0) or 0
+        k = item.get("fert_k", 0) or 0
+        fe = item.get("fert_fe", 0) or 0
+        if po4 > 0 and no3 == 0:
+            return 1  # Фосфат
+        if no3 > 0:
+            return 2  # Нитрат
+        if k > 0 and po4 == 0 and no3 == 0:
+            return 3  # Калий
+        if fe > 0:
+            return 4  # Микро
+        return 5
+
+    for date in dosing_by_date:
+        dosing_by_date[date].sort(key=_fert_sort_key)
 
     reading_keys = [p[0] for p in TEST_PARAMS]
     for r in reading_rows:
