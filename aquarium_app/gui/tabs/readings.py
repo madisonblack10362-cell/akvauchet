@@ -655,7 +655,7 @@ class ReadingsTab:
         dose_rows = sorted(dose_rows, key=_fk)
         for r in dose_rows:
             dose_events.setdefault(r["date"], []).append(
-                f'{r["fert_name"]} {r["dose"]} мл'
+                (r["fert_name"], r["dose"])
             )
 
         draw_param_trend_chart(

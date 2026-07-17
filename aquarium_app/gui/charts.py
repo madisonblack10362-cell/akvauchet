@@ -728,8 +728,8 @@ def on_chart_hover(canvas, event):
     if dose_list:
         tip_lines.append(("sep", "", ""))
         tip_lines.append(("dose_hdr", "Внесено удобрений:", COLOR_TEXT_MUTED))
-        for entry in dose_list:
-            tip_lines.append(("dose", entry, COLOR_TEXT_MUTED))
+        for fert_name, dose_val in dose_list:
+            tip_lines.append(("dose_split", fert_name, dose_val))
 
     # ===== БЛОК 4: Последняя подмена =====
     if hover_date:
@@ -789,6 +789,16 @@ def on_chart_hover(canvas, event):
             tk.Label(row_f, text=f"{_label}: ", bg="#05060a", fg=elem_color,
                      font=(ff, 8), anchor="w", pady=0).pack(side="left")
             tk.Label(row_f, text=consumed_text, bg="#05060a", fg=val_color,
+                     font=(ff, 8), anchor="w", pady=0).pack(side="left")
+            continue
+        if item[0] == "dose_split":
+            # имя серым, доза зелёным
+            fert_name, dose_val = item[1], item[2]
+            row_f = tk.Frame(pad_frame, bg="#05060a")
+            row_f.pack(fill="x")
+            tk.Label(row_f, text=f"{fert_name}: ", bg="#05060a", fg=COLOR_TEXT_MUTED,
+                     font=(ff, 8), anchor="w", pady=0).pack(side="left")
+            tk.Label(row_f, text=f"{dose_val} мл", bg="#05060a", fg="#6bcb77",
                      font=(ff, 8), anchor="w", pady=0).pack(side="left")
             continue
         _lbl, text, color = item[0], item[1], item[2]
