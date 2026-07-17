@@ -362,10 +362,11 @@ class ReadingsTab:
 
     def _reading_form_dialog(self, title, entry=None):
         """Модальный диалог для добавления/редактирования показания."""
-        dlg = tk.Toplevel(self.root)
+        dlg = tk.Toplevel(self.root if hasattr(self, "root") else self)
         dlg.title(title)
         dlg.configure(bg=COLOR_BG)
-        dlg.transient(self.root)
+        parent = self.root if hasattr(self, "root") else self
+        dlg.transient(parent)
         dlg.grab_set()
         dlg.resizable(False, False)
 
