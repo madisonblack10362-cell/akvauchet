@@ -699,7 +699,7 @@ def on_chart_hover(canvas, event):
         tip_lines.append(("wc", f'Подмена: {p["value"]:.1f}%', "#20c997"))
 
     # ===== БЛОК 2: Израсходовано (отдельный блок) =====
-    consumed_lines = []
+    consumed_lines = []  # [(label, elem_color, consumed_text, val_color), ...]
     for color, label in all_labels:
         real_matched = [p for p in same_x if p["label"] == label]
         if not real_matched:
@@ -719,23 +719,15 @@ def on_chart_hover(canvas, event):
             prev_d, prev_v = hist[cur_idx - 1]
             delta = val - prev_v
             consumed = -delta
-            try:
-                d_cur = dt.date.fromisoformat(hover_iso)
-                d_prev = dt.date.fromisoformat(prev_d)
-                days_diff = (d_cur - d_prev).days
-                if days_diff > 0:
-                    daily = consumed / days_diff
-                    consumed_lines.append(f"{label}: {fmt_axis(consumed)} (~{fmt_axis(daily)}/день)")
-                else:
-                    consumed_lines.append(f"{label}: {fmt_axis(consumed)}")
-            except Exception:
-                consumed_lines.append(f"{label}: {fmt_axis(consumed)}")
+            # зелёный если показания выросли, красный если упали
+            val_color = "#51cf66" if delta > 0 else "#ff6b6b"
+            consumed_lines.append((label, color, fmt_axis(consumed), val_color))
 
     if consumed_lines:
         tip_lines.append(("sep", "", ""))
         tip_lines.append(("cons_hdr", "Израсходовано:", COLOR_TEXT_MUTED))
-        for cl in consumed_lines:
-            tip_lines.append(("cons", f"  {cl}", COLOR_TEXT_MUTED))
+        for _label, elem_color, consumed_text, val_color in consumed_lines:
+            tip_lines.append(("cons_split", _label, elem_color, consumed_text, val_color))
 
     # ===== БЛОК 3: Внесено удобрений =====
     if dose_list:
@@ -788,12 +780,23 @@ def on_chart_hover(canvas, event):
              font=(ff, 7), anchor="w").pack(fill="x")
 
     line_h = 14
-    for _lbl, text, color in tip_lines:
-        if _lbl == "sep":
+    for item in tip_lines:
+        if item[0] == "sep":
             sep_f = tk.Frame(pad_frame, bg="#05060a", height=4)
             sep_f.pack(fill="x")
             tk.Frame(sep_f, bg=COLOR_BORDER, height=1).pack(fill="x", pady=(1, 0))
             continue
+        if item[0] == "cons_split":
+            # два цвета: элемент своим цветом, значение зелёным/красным
+            _label, elem_color, consumed_text, val_color = item[1], item[2], item[3], item[4]
+            row_f = tk.Frame(pad_frame, bg="#05060a")
+            row_f.pack(fill="x")
+            tk.Label(row_f, text=f"  {_label}: ", bg="#05060a", fg=elem_color,
+                     font=(ff, 8), anchor="w", pady=0).pack(side="left")
+            tk.Label(row_f, text=consumed_text, bg="#05060a", fg=val_color,
+                     font=(ff, 8, "bold"), anchor="w", pady=0).pack(side="left")
+            continue
+        _lbl, text, color = item[0], item[1], item[2]
         is_bold = _lbl in ("dose_hdr", "cons_hdr")
         fnt = (ff, 8, "bold") if is_bold else (ff, 8)
         tk.Label(pad_frame, text=text, bg="#05060a", fg=color,
