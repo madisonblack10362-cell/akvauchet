@@ -141,7 +141,7 @@ def draw_element_bars(canvas, items, font_family="Segoe UI"):
         canvas.create_rectangle(bar_x0, y0, bar_x0 + bar_w, y1,
                                 outline="", fill=color)
         # значение с единицей измерения справа от бара
-        val_text = f"{_smart_fmt(v)} мг/л"
+        val_text = f"{fmt_axis(v)} мг/л"
         canvas.create_text(bar_x0 + bar_max_w + 6, ymid, anchor="w",
                            text=val_text, fill=COLOR_ACCENT,
                            font=(font_family, 9, "bold"))
@@ -600,7 +600,7 @@ def _on_bars_hover(canvas, event):
         canvas.create_oval(tx + 10, py + 2, tx + 18, py + 10,
                             fill=color, outline="", tags="hover")
         canvas.create_text(tx + 22, py + 6, anchor="w",
-                            text=f"{label}:  {_smart_fmt(val)} мг/л",
+                            text=f"{label}:  {fmt_axis(val)} мг/л",
                             fill=color, font=(ff, 9, "bold"), tags="hover")
 
 
@@ -640,19 +640,19 @@ def on_chart_hover(canvas, event):
         matched = [p for p in same_x if p["label"] == label]
         if matched:
             p = matched[0]
-            tip_lines.append((label, f'{label}: {_smart_fmt(p["value"])}', color))
+            tip_lines.append((label, f'{label}: {fmt_axis(p["value"])}', color))
         else:
             # нет точки на этой дате — ищем ближайшую слева (carry forward)
             left_points = [p for p in points if p["label"] == label and p["x"] <= x]
             if left_points:
                 closest = max(left_points, key=lambda p: p["x"])
-                tip_lines.append((label, f'{label}: {_smart_fmt(closest["value"])}', color))
+                tip_lines.append((label, f'{label}: {fmt_axis(closest["value"])}', color))
             else:
                 # нет точек слева — ищем ближайшую справа
                 right_points = [p for p in points if p["label"] == label and p["x"] > x]
                 if right_points:
                     closest = min(right_points, key=lambda p: p["x"])
-                    tip_lines.append((label, f'{label}: {_smart_fmt(closest["value"])}', color))
+                    tip_lines.append((label, f'{label}: {fmt_axis(closest["value"])}', color))
                 else:
                     tip_lines.append((label, f"{label}: 0", color))
     # подмена — отдельно, без carry-forward
