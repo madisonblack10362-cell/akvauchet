@@ -614,15 +614,28 @@ def _on_bars_hover(canvas, event):
 # on_chart_hover / on_chart_leave — подсказки при наведении
 # ---------------------------------------------------------------------------
 
+# глобальная ссылка на окно тултипа, чтобы закрыть при уходе
+_tooltip_win = None
+
+
+def _close_tooltip():
+    """Закрывает окно тултипа, если оно открыто."""
+    global _tooltip_win
+    if _tooltip_win and _tooltip_win.winfo_exists():
+        _tooltip_win.destroy()
+    _tooltip_win = None
+
+
 def on_chart_hover(canvas, event):
-    """Показывает подсказку (дата + значения ВСЕХ параметров) для колонки точек
-    рядом с курсором. Для отсутствующих в этот день параметров показывает
-    значение ближайшей точки (carry forward для нарастающего графика).
+    """Показывает подсказку (Toplevel-окно) с датой, значениями, дельтой,
+    расходом, нормой, днями от подмены/дозирования и внесёнными удобрениями.
     """
+    global _tooltip_win
     if not canvas.winfo_exists():
         return
     points = getattr(canvas, "_hover_points", [])
     canvas.delete("hover")
+    _close_tooltip()
     if not points:
         return
     nearest = min(points, key=lambda p: abs(p["x"] - event.x))
@@ -632,9 +645,9 @@ def on_chart_hover(canvas, event):
     h = getattr(canvas, "_hover_h", 80)
     w = getattr(canvas, "_hover_w", 200)
     ff = _get_chart_font(canvas)
-    # направляющая вертикальная линия
+    # направляющая вертикальная линия на канвасе
     canvas.create_line(x, 0, x, h, fill="#3a3f4d", dash=(2, 2), tags="hover")
-    # подсвеченные точки (только те что реально есть на этой дате)
+    # подсвеченные точки
     same_x = [p for p in points if p["date"] == nearest["date"]]
     for p in same_x:
         canvas.create_oval(p["x"] - 4, p["y"] - 4, p["x"] + 4, p["y"] + 4,
@@ -648,19 +661,14 @@ def on_chart_hover(canvas, event):
         hover_date = None
     hover_iso = raw_date if isinstance(raw_date, str) else raw_date.isoformat()
 
-    param_hist = getattr(canvas, "_param_hist", {})   # {key: [(date_iso, value), ...]}
-    target_ranges = getattr(canvas, "_target_ranges", {})  # {key: (min, max)}
+    param_hist = getattr(canvas, "_param_hist", {})
+    target_ranges = getattr(canvas, "_target_ranges", {})
     wc_dates_set = getattr(canvas, "_wc_dates_set", set())
     dose_dates_set = getattr(canvas, "_dose_dates_set", set())
-    # label → key маппинг (из strips: key=po4 → label=PO4)
-    label_to_key = {}
-    for p in points:
-        label_to_key[p["label"]] = p.get("_key", "")
 
     # --- счётчики «дней от …» ---
-    meta_lines = []  # (text, color) — информационные строки после значений
+    meta_lines = []
     if hover_date:
-        # дней от последней подмены
         prev_wc = [d for d in wc_dates_set if d < hover_iso]
         if prev_wc:
             try:
@@ -669,7 +677,6 @@ def on_chart_hover(canvas, event):
                 meta_lines.append((f"Подмена: {days_wc} дн. назад", "#20c997"))
             except Exception:
                 pass
-        # дней от последнего внесения
         prev_dose = [d for d in dose_dates_set if d < hover_iso]
         if prev_dose:
             try:
@@ -679,37 +686,34 @@ def on_chart_hover(canvas, event):
             except Exception:
                 pass
 
-    # собираем tooltip: для каждого элемента ищем ближайшую точку слева (<= x)
+    # собираем tooltip: для каждого элемента ищем ближайшую точку
     all_labels = getattr(canvas, "_hover_all_labels", [])
     tip_lines = []
     for color, label in all_labels:
         matched = [p for p in same_x if p["label"] == label]
         if matched:
             p = matched[0]
-            tip_lines.append((label, f'{label}: {fmt_axis(p["value"])}', color))
+            tip_lines.append(("val", f'{label}: {fmt_axis(p["value"])}', color))
         else:
-            # нет точки на этой дате — ищем ближайшую слева (carry forward)
             left_points = [p for p in points if p["label"] == label and p["x"] <= x]
             if left_points:
                 closest = max(left_points, key=lambda p: p["x"])
-                tip_lines.append((label, f'{label}: {fmt_axis(closest["value"])}', color))
+                tip_lines.append(("val", f'{label}: {fmt_axis(closest["value"])}', color))
             else:
-                # нет точек слева — ищем ближайшую справа
                 right_points = [p for p in points if p["label"] == label and p["x"] > x]
                 if right_points:
                     closest = min(right_points, key=lambda p: p["x"])
-                    tip_lines.append((label, f'{label}: {fmt_axis(closest["value"])}', color))
+                    tip_lines.append(("val", f'{label}: {fmt_axis(closest["value"])}', color))
                 else:
-                    tip_lines.append((label, f"{label}: 0", color))
+                    tip_lines.append(("val", f"{label}: 0", color))
 
-    # --- дельта и расход/день для параметров с реальной точкой на этой дате ---
+    # --- дельта, расход/день, норма ---
     for color, label in all_labels:
         matched = [p for p in same_x if p["label"] == label]
         if not matched:
             continue
         p = matched[0]
         val = p["value"]
-        # ищем key по label через points
         pkey = ""
         for pp in points:
             if pp["label"] == label:
@@ -718,7 +722,6 @@ def on_chart_hover(canvas, event):
         if not pkey or pkey not in param_hist:
             continue
         hist = param_hist[pkey]
-        # индекс текущей точки в истории
         cur_idx = None
         for i, (d, v) in enumerate(hist):
             if d == hover_iso and v == val:
@@ -726,114 +729,111 @@ def on_chart_hover(canvas, event):
                 break
         if cur_idx is None:
             continue
-        # --- дельта от предыдущего замера ---
         if cur_idx > 0:
             prev_d, prev_v = hist[cur_idx - 1]
             delta = val - prev_v
             arrow = "+" if delta > 0 else ""
-            delta_str = f"{arrow}{fmt_axis(delta)}"
             delta_color = "#ff6b6b" if delta > 0 else "#51cf66"
-            tip_lines.append(("delta", f"  {delta_str}", delta_color))
-            # --- расход в день ---
+            tip_lines.append(("delta", f"  {arrow}{fmt_axis(delta)}", delta_color))
             try:
                 d_cur = dt.date.fromisoformat(hover_iso)
                 d_prev = dt.date.fromisoformat(prev_d)
                 days_diff = (d_cur - d_prev).days
                 if days_diff > 0:
-                    daily = -delta / days_diff  # расход = падение / дни
+                    daily = -delta / days_diff
                     tip_lines.append(("rate", f"  ~{fmt_axis(daily)}/день", COLOR_TEXT_MUTED))
             except Exception:
                 pass
-        # --- целевой диапазон ---
         if pkey in target_ranges:
             t_min, t_max = target_ranges[pkey]
             if t_min is not None and t_max is not None:
                 tip_lines.append(("target", f"  норма: {fmt_axis(t_min)}-{fmt_axis(t_max)}", "#4dabf7"))
 
-    # подмена — отдельно, без carry-forward
+    # подмена — отдельно
     wc_matched = [p for p in same_x if p.get("_is_wc")]
     if wc_matched:
         p = wc_matched[0]
         tip_lines.append(("wc", f'Подмена: {p["value"]:.1f}%', "#20c997"))
-    # дозировки — из предзагруженных данных
+
+    # дозировки
     dose_map = getattr(canvas, "_dose_events", {})
     dose_list = []
     if dose_map:
-        d_key = hover_iso
-        dose_list = dose_map.get(d_key, [])
+        dose_list = dose_map.get(hover_iso, [])
     if dose_list or meta_lines:
-        # разделитель перед блоком доп. инфо
         tip_lines.append(("sep", "", ""))
-        # «дней от подмены/дозирования»
         for txt, clr in meta_lines:
             tip_lines.append(("meta", txt, clr))
         if dose_list:
             tip_lines.append(("dose_hdr", "Внесено удобрений:", "#fcc419"))
             for entry in dose_list:
                 tip_lines.append(("dose", entry, "#fcc419"))
-    # текст подсказки
+
+    # --- дата ---
     if isinstance(raw_date, dt.date):
         date_str = raw_date.strftime("%d.%m.%Y")
     else:
         date_str = from_iso(raw_date)
-    # собираем текстовые строки для подсчёта ширины
-    vis_lines = [t for _lbl, t, _c in tip_lines if _lbl != "sep"]
-    n_vis = len(vis_lines) + 1  # +1 для даты
+
+    # --- создаём Toplevel-тултип ---
+    root = canvas.winfo_toplevel()
+    tip = tk.Toplevel(root)
+    tip.wm_overrideredirect(True)
+    tip.attributes("-topmost", True)
+    tip.configure(bg="#05060a")
+
+    # рамка
+    outer = tk.Frame(tip, bg=COLOR_BORDER, padx=1, pady=1)
+    outer.pack(fill="both", expand=True)
+    inner = tk.Frame(outer, bg="#05060a")
+    inner.pack(fill="both", expand=True)
+
+    # padding
+    pad_frame = tk.Frame(inner, bg="#05060a", padx=9, pady=7)
+    pad_frame.pack(fill="both", expand=True)
+
+    # дата
+    tk.Label(pad_frame, text=date_str, bg="#05060a", fg=COLOR_TEXT_MUTED,
+             font=(ff, 7), anchor="w").pack(fill="x")
+
     line_h = 14
-    n_seps = sum(1 for _lbl, _, _ in tip_lines if _lbl == "sep")
-    box_h = line_h * n_vis + 4 * n_seps + 10
-    # точная ширина через measure_text
-    tmp = canvas.create_text(0, 0, text="", font=(ff, 8, "bold"))
-    max_tw = 0
-    for t in [date_str] + vis_lines:
-        canvas.itemconfig(tmp, text=t)
-        bb = canvas.bbox(tmp)
-        if bb:
-            max_tw = max(max_tw, bb[2] - bb[0])
-    canvas.delete(tmp)
-    text_w = max_tw + 18
-    tx = x + 8
-    if tx + text_w > w:
-        tx = max(0, x - text_w - 8)
-    # позиционирование по Y: пытаемся показать снизу от курсора
-    ty = event.y + 12
-    if ty + box_h > h:
-        # не влезает снизу — показываем сверху от курсора
-        ty = event.y - box_h - 8
-    if ty < 0:
-        ty = 0
-    # если всё равно не влезает — обрезаем по высоте канваса
-    if ty + box_h > h:
-        box_h = h - ty
-    canvas.create_rectangle(tx, ty, tx + text_w, ty + box_h,
-                             fill="#05060a", outline=COLOR_BORDER, tags="hover")
-    # левый отступ для текста (центрируем по самой длинной строке)
-    pad_l = (text_w - max_tw) // 2
-    # начальная Y — с учётом обрезки сверху
-    cur_y = ty + 7
-    bottom_limit = ty + box_h - 4  # не рисовать ниже этого
-    canvas.create_text(tx + pad_l, cur_y, anchor="w", text=date_str,
-                        fill=COLOR_TEXT_MUTED, font=(ff, 7), tags="hover")
-    cur_y += line_h
     for _lbl, text, color in tip_lines:
         if _lbl == "sep":
-            # тонкая линия-разделитель
-            if cur_y + 2 < bottom_limit:
-                canvas.create_line(tx + 6, cur_y - 1, tx + text_w - 6, cur_y - 1,
-                                   fill=COLOR_BORDER, dash=(2, 2), tags="hover")
-            cur_y += 4
+            sep_f = tk.Frame(pad_frame, bg="#05060a", height=4)
+            sep_f.pack(fill="x")
+            tk.Frame(sep_f, bg=COLOR_BORDER, height=1).pack(fill="x", pady=(1, 0))
             continue
-        if cur_y + line_h > bottom_limit:
-            break  # не влезает — прекращаем
-        fnt = (ff, 8, "bold") if _lbl in ("delta", "dose_hdr") else (ff, 8)
-        canvas.create_text(tx + pad_l, cur_y, anchor="w",
-                            text=text,
-                            fill=color, font=fnt, tags="hover")
-        cur_y += line_h
+        is_bold = _lbl in ("delta", "dose_hdr")
+        fnt = (ff, 8, "bold") if is_bold else (ff, 8)
+        tk.Label(pad_frame, text=text, bg="#05060a", fg=color,
+                 font=fnt, anchor="w", pady=0).pack(fill="x")
+
+    # позиционирование: относительно корневого окна
+    tip.update_idletasks()
+    tw = tip.winfo_reqwidth()
+    th = tip.winfo_reqheight()
+    # координаты курсора в экранных координатах
+    rx = canvas.winfo_rootx() + event.x
+    ry = canvas.winfo_rooty() + event.y
+    tx = rx + 14
+    ty = ry + 14
+    sw = tip.winfo_screenwidth()
+    sh = tip.winfo_screenheight()
+    if tx + tw > sw:
+        tx = rx - tw - 14
+    if ty + th > sh:
+        ty = ry - th - 14
+    if tx < 0:
+        tx = 0
+    if ty < 0:
+        ty = 0
+    tip.wm_geometry(f"+{tx}+{ty}")
+    _tooltip_win = tip
 
 
 def on_chart_leave(canvas):
     """Убирает подсказку при уходе курсора с графика."""
+    _close_tooltip()
     if canvas.winfo_exists():
         canvas.delete("hover")
 
