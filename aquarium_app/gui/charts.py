@@ -733,29 +733,32 @@ def on_chart_hover(canvas, event):
 
     if consumed_lines:
         tip_lines.append(("sep", "", ""))
-        tip_lines.append(("cons_hdr", "Израсходовано:", "#ff6b6b"))
+        tip_lines.append(("cons_hdr", "Израсходовано:", COLOR_TEXT_MUTED))
         for cl in consumed_lines:
-            tip_lines.append(("cons", f"  {cl}", "#ff6b6b"))
+            tip_lines.append(("cons", f"  {cl}", COLOR_TEXT_MUTED))
 
-    # ===== БЛОК 3: Внесено удобрений + дозирование =====
-    if dose_list or (hover_date and dose_dates_set):
+    # ===== БЛОК 3: Внесено удобрений =====
+    if dose_list:
         tip_lines.append(("sep", "", ""))
-        if dose_list:
-            tip_lines.append(("dose_hdr", "Внесено удобрений:", "#fcc419"))
-            for entry in dose_list:
-                tip_lines.append(("dose", entry, "#fcc419"))
-        if hover_date:
-            prev_dose = [d for d in dose_dates_set if d <= hover_iso]
-            if prev_dose:
-                try:
-                    last_dose = max(dt.date.fromisoformat(d) for d in prev_dose)
-                    days_dose = (hover_date - last_dose).days
-                    if days_dose == 0:
-                        tip_lines.append(("meta", "Дозирование: сегодня", "#fcc419"))
-                    else:
-                        tip_lines.append(("meta", f"Дозирование: {days_dose} дн. назад", "#fcc419"))
-                except Exception:
-                    pass
+        tip_lines.append(("dose_hdr", "Внесено удобрений:", "#fcc419"))
+        for entry in dose_list:
+            tip_lines.append(("dose", entry, "#fcc419"))
+
+    # ===== БЛОК 4: Последняя подмена =====
+    if hover_date:
+        prev_wc = [d for d in wc_dates_set if d <= hover_iso]
+        if prev_wc:
+            try:
+                last_wc = max(dt.date.fromisoformat(d) for d in prev_wc)
+                days_wc = (hover_date - last_wc).days
+                if days_wc == 0:
+                    wc_text = "Последняя подмена: сегодня"
+                else:
+                    wc_text = f"Последняя подмена: {days_wc} дн. назад"
+                tip_lines.append(("sep", "", ""))
+                tip_lines.append(("meta", wc_text, "#20c997"))
+            except Exception:
+                pass
 
     # --- дата ---
     if isinstance(raw_date, dt.date):

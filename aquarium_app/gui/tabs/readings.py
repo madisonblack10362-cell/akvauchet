@@ -664,7 +664,7 @@ class ReadingsTab:
             history_fn=history_fn,
             font_family=self.FF,
             empty_message="недостаточно данных для графика",
-            target_ranges=get_targets(self.conn, aq_id) if aq_id else None,
+            target_ranges=None,
             wc_events=wc_events if wc_events else None,
             dose_events=dose_events if dose_events else None,
         )
