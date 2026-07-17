@@ -162,9 +162,21 @@ class DosingTab:
         ttk.Entry(row2, textvariable=self.dose_comment_var, width=50).pack(
             side="left", padx=(2, 0), fill="x", expand=True)
 
+        # кнопки над таблицей
+        btn_row = tk.Frame(tab, bg=COLOR_BG)
+        btn_row.pack(fill="x", padx=16, pady=(4, 0))
+        tk.Button(btn_row, text="Редактировать", font=(FF, 9), relief="flat",
+                  bg=COLOR_CARD, fg=COLOR_TEXT, activebackground=COLOR_ALT_ROW,
+                  borderwidth=0, padx=12, pady=4, command=self.edit_dosing_entry,
+                  cursor="hand2").pack(side="left")
+        tk.Button(btn_row, text="Удалить", font=(FF, 9), relief="flat",
+                  bg=COLOR_CARD, fg=COLOR_TEXT, activebackground=COLOR_ALT_ROW,
+                  borderwidth=0, padx=12, pady=4, command=self.delete_dosing_selected,
+                  cursor="hand2").pack(side="left", padx=(8, 0))
+
         # ---- таблица дозировок ----
         table_frame = tk.Frame(tab, bg=COLOR_BG)
-        table_frame.pack(fill="both", expand=True, padx=12, pady=(4, 4))
+        table_frame.pack(fill="both", expand=True, padx=12, pady=(4, 12))
 
         dose_cols = ("date", "fert", "dose", "comment",
                      "no3", "po4", "k", "fe", "mg", "ca")
@@ -196,18 +208,6 @@ class DosingTab:
         hsb.grid(row=1, column=0, sticky="ew")
         table_frame.grid_rowconfigure(0, weight=1)
         table_frame.grid_columnconfigure(0, weight=1)
-
-        # кнопки под таблицей
-        btn_row = tk.Frame(tab, bg=COLOR_BG)
-        btn_row.pack(fill="x", padx=16, pady=(0, 12))
-        tk.Button(btn_row, text="Редактировать", font=(FF, 9), relief="flat",
-                  bg=COLOR_CARD, fg=COLOR_TEXT, activebackground=COLOR_ALT_ROW,
-                  borderwidth=0, padx=12, pady=4, command=self.edit_dosing_entry,
-                  cursor="hand2").pack(side="left")
-        tk.Button(btn_row, text="Удалить", font=(FF, 9), relief="flat",
-                  bg=COLOR_CARD, fg=COLOR_TEXT, activebackground=COLOR_ALT_ROW,
-                  borderwidth=0, padx=12, pady=4, command=self.delete_dosing_selected,
-                  cursor="hand2").pack(side="left", padx=(8, 0))
 
         # инициализация
         self._fert_map = {}
