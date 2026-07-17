@@ -427,23 +427,18 @@ class App(
                     "AquaUchet.AquariumApp.1")
             except (AttributeError, OSError):
                 pass
-        # при frozen — иконка уже вшита в .exe через --icon, не трогаем
-        if getattr(sys, "frozen", False):
-            return
-        # для разработки — ищем иконку рядом
-        icon_path_ico = os.path.join(RESOURCES_DIR, "aquarium_app.ico")
-        icon_path_png = os.path.join(RESOURCES_DIR, "icon.png")
         self._icon_photo = None
-        if os.path.exists(icon_path_ico):
-            try:
-                self.iconbitmap(default=True, bitmap=icon_path_ico)
-                return
-            except tk.TclError:
-                pass
+        # для .exe — берём из бандла (_MEIPASS), для разработки — рядом
+        icon_path_png = os.path.join(RESOURCES_DIR, "icon.png")
         if os.path.exists(icon_path_png):
             try:
                 self._icon_photo = tk.PhotoImage(file=icon_path_png)
                 self.iconphoto(True, self._icon_photo)
-                return
+            except tk.TclError:
+                pass
+        icon_path_ico = os.path.join(RESOURCES_DIR, "aquarium_app.ico")
+        if os.path.exists(icon_path_ico):
+            try:
+                self.iconbitmap(default=True, bitmap=icon_path_ico)
             except tk.TclError:
                 pass
