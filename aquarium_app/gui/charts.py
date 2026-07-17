@@ -670,7 +670,7 @@ def on_chart_hover(canvas, event):
     if dose_list:
         # разделитель перед блоком удобрений
         tip_lines.append(("sep", "", ""))
-        tip_lines.append(("dose_hdr", "Удобрения:", "#fcc419"))
+        tip_lines.append(("dose_hdr", "Внесено удобрений:", "#fcc419"))
         for entry in dose_list:
             tip_lines.append(("dose", entry, "#fcc419"))
     # текст подсказки
