@@ -206,6 +206,15 @@ def draw_param_trend_chart(
         if len(hist) >= 2:
             strips.append((key, color, label, hist))
 
+    # подмена воды — отдельная полоса как остальные параметры
+    wc_color = "#20c997"
+    wc_label = "Подмена"
+    wc_hist = []
+    if wc_events:
+        wc_hist = [(d, pct) for d, pct in wc_events]
+        if len(wc_hist) >= 1:
+            strips.append(("_wc", wc_color, wc_label, wc_hist))
+
     if not strips:
         canvas.create_text(w // 2, h // 2, text=empty_message,
                            fill=COLOR_TEXT_MUTED, font=(font_family, 8, "italic"))
@@ -292,7 +301,8 @@ def draw_param_trend_chart(
             y = strip_bottom - strip_h * frac
             points.append((x, y))
             hover_points.append({"x": x, "y": y, "date": date_iso, "value": v,
-                                  "label": label, "color": color})
+                                  "label": label, "color": color,
+                                  "_is_wc": key == "_wc"})
 
         for i in range(len(points) - 1):
             canvas.create_line(points[i][0], points[i][1],
@@ -306,31 +316,8 @@ def draw_param_trend_chart(
         canvas.create_text(label_x, last_y, anchor="w", text=label,
                            fill=color, font=(font_family, 8, "bold"))
 
-    # ---- полоса подмен воды ----
-    wc_strip_h = 14
-    wc_strip_top = h - wc_strip_h - pad_b
-    wc_strip_bot = h - pad_b
-    if wc_events:
-        # фоновая полоса
-        canvas.create_rectangle(pad_l, wc_strip_top, pad_l + plot_w, wc_strip_bot,
-                                 fill="#0d2b1a", outline="#1a4a2e", width=1)
-        max_pct = max((pct for _, pct in wc_events), default=0) or 1
-        bar_w = max(3, min(8, plot_w / max(span_days, 7) * 0.6))
-        for date_iso, pct in wc_events:
-            x = x_for_date(date_iso)
-            bar_h = (pct / max_pct) * (wc_strip_h - 4)
-            x0 = x - bar_w / 2
-            x1 = x + bar_w / 2
-            canvas.create_rectangle(x0, wc_strip_bot - bar_h - 1, x1, wc_strip_bot - 1,
-                                     fill="#20c997", outline="")
-            if bar_w >= 5:
-                canvas.create_text(x, wc_strip_bot - bar_h - 5, anchor="s",
-                                   text=f"{pct:.0f}%", fill="#20c997",
-                                   font=(font_family, 6))
-        canvas.create_text(pad_l - 4, (wc_strip_top + wc_strip_bot) / 2, anchor="e",
-                           text="подмена", fill="#20c997", font=(font_family, 6))
     # ---- подписи оси X (даты начала и конца периода) ----
-    axis_y = wc_strip_top - 2 if wc_events else h - 2
+    axis_y = h - 2
     canvas.create_text(pad_l, axis_y, anchor="sw", text=period_start.strftime("%d.%m"),
                        fill=COLOR_TEXT_MUTED, font=(font_family, 7))
     canvas.create_text(pad_l + plot_w, axis_y, anchor="se", text=period_end.strftime("%d.%m"),
@@ -347,7 +334,7 @@ def draw_param_trend_chart(
     canvas._hover_w = w
     canvas._hover_type = "trend"
     # все метки чтобы показывать 0 для отсутствующих в конкретный день
-    canvas._hover_all_labels = [(color, label) for _key, color, label, _hist in strips]
+    canvas._hover_all_labels = [(color, label) for _key, color, label, _hist in strips if _key != "_wc"]
     canvas.bind("<Motion>", lambda e, c=canvas: on_chart_hover(c, e))
     canvas.bind("<Leave>", lambda e, c=canvas: on_chart_leave(c))
 
@@ -666,6 +653,11 @@ def on_chart_hover(canvas, event):
                     tip_lines.append((label, f'{label}: {closest["value"]:.2f}', color))
                 else:
                     tip_lines.append((label, f"{label}: 0.00", color))
+    # подмена — отдельно, без carry-forward
+    wc_matched = [p for p in same_x if p.get("_is_wc")]
+    if wc_matched:
+        p = wc_matched[0]
+        tip_lines.append(("wc", f'Подмена: {p["value"]:.1f}%', "#20c997"))
     # текст подсказки
     raw_date = nearest["date"]
     if isinstance(raw_date, dt.date):

@@ -77,7 +77,7 @@ class ReadingsTab:
                               highlightbackground=COLOR_BORDER, highlightthickness=1)
         chart_card.pack(fill="x", padx=12, pady=4)
         self.readings_trend_canvas = tk.Canvas(chart_card, bg=COLOR_CARD,
-                                               height=140, highlightthickness=0)
+                                               height=160, highlightthickness=0)
         self.readings_trend_canvas.pack(fill="x", padx=2, pady=2)
 
         # --- форма добавления ---
