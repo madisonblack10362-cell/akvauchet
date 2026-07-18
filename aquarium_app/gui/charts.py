@@ -722,8 +722,12 @@ def on_chart_hover(canvas, event):
             try:
                 last_wc = max(dt.date.fromisoformat(d) for d in prev_wc)
                 days_wc = (hover_date - last_wc).days
-                if days_wc == 0:
+                if days_wc == 0 and hover_date == dt.date.today():
                     wc_text = "Последняя подмена: сегодня"
+                elif days_wc == 0:
+                    wc_text = f"Последняя подмена: в этот день"
+                elif days_wc == 1:
+                    wc_text = "Последняя подмена: вчера"
                 else:
                     wc_text = f"Последняя подмена: {days_wc} дн. назад"
                 tip_lines.append(("sep", "", ""))
