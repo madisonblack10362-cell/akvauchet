@@ -15,7 +15,7 @@ from aquarium_app.config import (
 from aquarium_app.db import (
     get_readings, get_readings_by_date, add_reading, delete_reading,
     get_reading, update_reading, get_aquarium,
-    get_dosing_filtered, get_targets,
+    get_dosing_filtered,
 )
 from aquarium_app.logic.calculations import out_of_range_flags
 from aquarium_app.logic.formatters import from_iso, to_iso, today_str, parse_float
@@ -658,21 +658,12 @@ class ReadingsTab:
                 (r["fert_name"], r["dose"])
             )
 
-        # целевые диапазоны для графика
-        targets = get_targets(self.conn, aq_id)
-        target_ranges = {}
-        for k, _, _ in param_defs:
-            rng = targets.get(k)
-            if rng and rng[0] is not None and rng[1] is not None:
-                target_ranges[k] = rng
-
         draw_param_trend_chart(
             c, self.conn, aq_id, param_defs,
             days=days, since_iso=since_iso,
             history_fn=history_fn,
             font_family=self.FF,
             empty_message="недостаточно данных для графика",
-            target_ranges=target_ranges if target_ranges else None,
             wc_events=wc_events if wc_events else None,
             dose_events=dose_events if dose_events else None,
         )
