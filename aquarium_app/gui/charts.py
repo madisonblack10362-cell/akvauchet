@@ -704,7 +704,7 @@ def on_chart_hover(canvas, event):
 
     if consumed_lines:
         tip_lines.append(("sep", "", ""))
-        tip_lines.append(("cons_hdr", "\u0394:", COLOR_TEXT_MUTED))
+        tip_lines.append(("cons_hdr", "Израсходовано:", COLOR_TEXT_MUTED))
         for _label, elem_color, consumed_text, val_color in consumed_lines:
             tip_lines.append(("cons_split", _label, elem_color, consumed_text, val_color))
 
