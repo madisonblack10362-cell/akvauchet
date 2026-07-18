@@ -14,7 +14,7 @@ from aquarium_app.config import (
 )
 from aquarium_app.db import get_aquariums, get_aquarium
 from aquarium_app.logic.calculations import (
-    sum_current_calendar_week, compute_element_ratios, out_of_range_flags,
+    sum_last_n_days, compute_element_ratios, out_of_range_flags,
 )
 from aquarium_app.logic.formatters import from_iso
 from aquarium_app.gui.charts import draw_element_bars, schedule_chart_draw
@@ -151,9 +151,12 @@ class DashboardTab:
             tk.Label(left_col, text="Замеров пока нет", font=(FF, 9),
                      bg=COLOR_CARD, fg=COLOR_TEXT_MUTED).pack(anchor="w")
 
-        # --- бары элементов за неделю ---
-        totals, week_start, week_end = sum_current_calendar_week(self.conn, aq_id)
-        bar_label = (f"Внесено за неделю ({week_start.strftime('%d.%m')} - "
+        # --- бары элементов за неделю (скользящие 7 дней, как в Дозировании) ---
+        import datetime as _dt
+        week_end = _dt.date.today()
+        week_start = week_end - _dt.timedelta(days=7)
+        totals = sum_last_n_days(self.conn, aq_id, 7)
+        bar_label = (f"Внесено за 7 дней ({week_start.strftime('%d.%m')} - "
                      f"{week_end.strftime('%d.%m')}):")
         tk.Label(card, text=bar_label, font=(FF, 9, "bold"),
                  bg=COLOR_CARD, fg=COLOR_ACCENT_SOFT).pack(anchor="w", pady=(6, 2))
