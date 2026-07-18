@@ -13,3 +13,7 @@ venv/
 .vscode/
 *.db
 *.sqlite3
+build.bat
+*.exe
+*.ico
+*.spec
