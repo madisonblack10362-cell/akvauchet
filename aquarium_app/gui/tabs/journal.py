@@ -289,20 +289,11 @@ class JournalTab:
         def history_fn(key):
             return get_parameter_history(self.conn, aq_id, key, since_iso=date_from)
 
-        # получаем целевые диапазоны для графика
-        targets = get_targets(self.conn, aq_id)
-        target_ranges = {}
-        for key, _color, _label in param_defs:
-            rng = targets.get(key)
-            if rng and rng[0] is not None and rng[1] is not None:
-                target_ranges[key] = rng
-
         schedule_chart_draw(
             canvas, draw_param_trend_chart, self.conn, aq_id, param_defs,
             since_iso=date_from, history_fn=history_fn,
             font_family=self.FF,
             empty_message="нет данных о показаниях за период",
-            target_ranges=target_ranges,
         )
 
     # ------------------------------------------------------------------
