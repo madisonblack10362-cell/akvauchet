@@ -759,8 +759,13 @@ def on_chart_hover(canvas, event):
     if dose_list:
         tip_lines.append(("sep", "", ""))
         tip_lines.append(("dose_hdr", "Внесено удобрений:", COLOR_TEXT_MUTED))
-        for fert_name, dose_val in dose_list:
-            tip_lines.append(("dose_split", fert_name, dose_val))
+        for item in dose_list:
+            if len(item) == 3:
+                fert_name, dose_val, elem_clr = item
+            else:
+                fert_name, dose_val = item
+                elem_clr = COLOR_TEXT_MUTED
+            tip_lines.append(("dose_split", fert_name, dose_val, elem_clr))
 
     # --- дата ---
     if isinstance(raw_date, dt.date):
@@ -817,11 +822,10 @@ def on_chart_hover(canvas, event):
                      font=(ff, 8), anchor="w", pady=0).pack(side="left")
             continue
         if item[0] == "dose_split":
-            # имя серым, доза зелёным
-            fert_name, dose_val = item[1], item[2]
+            fert_name, dose_val, elem_clr = item[1], item[2], item[3]
             row_f = tk.Frame(pad_frame, bg="#05060a")
             row_f.pack(fill="x")
-            tk.Label(row_f, text=f"{fert_name}: ", bg="#05060a", fg=COLOR_TEXT_MUTED,
+            tk.Label(row_f, text=f"{fert_name}: ", bg="#05060a", fg=elem_clr,
                      font=(ff, 8), anchor="w", pady=0).pack(side="left")
             tk.Label(row_f, text=f"+{dose_val} мл", bg="#05060a", fg="#6bcb77",
                      font=(ff, 8), anchor="w", pady=0).pack(side="left")

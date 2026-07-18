@@ -654,8 +654,23 @@ class ReadingsTab:
             return 5
         dose_rows = sorted(dose_rows, key=_fk)
         for r in dose_rows:
+            # цвет по элементу удобрения
+            name = (r.get("fert_name") or "").lower()
+            if "микро" in name or "micro" in name:
+                clr = "#8B7D5E"
+            else:
+                clr = COLOR_ACCENT
+                for k in ("f_no3", "f_po4", "f_k", "f_mg", "f_ca"):
+                    if r.get(k):
+                        clr = ELEMENT_COLORS.get(k[2:], COLOR_ACCENT)
+                        break
+                else:
+                    for k in ("f_fe", "f_mn", "f_b", "f_zn", "f_cu", "f_mo", "f_co"):
+                        if r.get(k):
+                            clr = "#8B7D5E"
+                            break
             dose_events.setdefault(r["date"], []).append(
-                (r["fert_name"], r["dose"])
+                (r["fert_name"], r["dose"], clr)
             )
 
         draw_param_trend_chart(
