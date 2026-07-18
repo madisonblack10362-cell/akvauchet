@@ -208,8 +208,12 @@ class DashboardTab:
                     fert_name = d["fert_name"] or "Удобрение"
                     dose_val = d["dose"]
                     elem_clr = self._fert_color(d)
-                    tk.Label(right_col, text=f"{fert_name} {dose_val:g} мл",
-                             font=(FF, 9, "bold"), bg=COLOR_CARD, fg=elem_clr).pack(anchor="w")
+                    row = tk.Frame(right_col, bg=COLOR_CARD)
+                    row.pack(fill="x", anchor="w")
+                    tk.Label(row, text=f"{fert_name} ", font=(FF, 9, "bold"),
+                             bg=COLOR_CARD, fg=elem_clr).pack(side="left")
+                    tk.Label(row, text=f"{dose_val:g} мл", font=(FF, 9, "bold"),
+                             bg=COLOR_CARD, fg="#6bcb77").pack(side="left")
         else:
             tk.Label(left_col, text="Замеров пока нет", font=(FF, 9),
                      bg=COLOR_CARD, fg=COLOR_TEXT_MUTED).pack(anchor="w")
