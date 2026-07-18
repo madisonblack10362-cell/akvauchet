@@ -184,18 +184,23 @@ class DashboardTab:
             # последняя дозировка (плашка в стиле статусов)
             dosing_rows = get_dosing(self.conn, aq_id)
             if dosing_rows:
-                d = dosing_rows[0]
-                fert_name = d["fert_name"] or "Удобрение"
-                dose_val = d["dose"]
-                date_s = from_iso(d["date"])
+                # берём все записи за последнюю дату дозирования
+                last_dose_date = dosing_rows[0]["date"]
+                last_doses = [d for d in dosing_rows if d["date"] == last_dose_date]
+                date_s = from_iso(last_dose_date)
                 dose_frame = tk.Frame(right_col, bg="#1c1f2e", padx=6, pady=3)
                 dose_frame.pack(fill="x", pady=(4, 0))
                 tk.Label(dose_frame, text="Дозировка", font=(FF, 8),
                          bg="#1c1f2e", fg=COLOR_TEXT_MUTED).pack(anchor="w")
-                tk.Label(dose_frame, text=f"{fert_name} {dose_val:g} мл",
-                         font=(FF, 9, "bold"), bg="#1c1f2e", fg=COLOR_ACCENT).pack(side="left")
-                tk.Label(dose_frame, text=f"  — {date_s}",
-                         font=(FF, 9), bg="#1c1f2e", fg=COLOR_TEXT_MUTED).pack(side="left")
+                for d in last_doses:
+                    fert_name = d["fert_name"] or "Удобрение"
+                    dose_val = d["dose"]
+                    row = tk.Frame(dose_frame, bg="#1c1f2e")
+                    row.pack(fill="x")
+                    tk.Label(row, text=f"{fert_name} {dose_val:g} мл",
+                             font=(FF, 9, "bold"), bg="#1c1f2e", fg=COLOR_ACCENT).pack(side="left")
+                tk.Label(dose_frame, text=f"— {date_s}",
+                         font=(FF, 8), bg="#1c1f2e", fg=COLOR_TEXT_MUTED).pack(anchor="w")
         else:
             tk.Label(left_col, text="Замеров пока нет", font=(FF, 9),
                      bg=COLOR_CARD, fg=COLOR_TEXT_MUTED).pack(anchor="w")
