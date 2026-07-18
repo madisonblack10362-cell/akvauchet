@@ -58,8 +58,8 @@ echo.
 
 REM ---- 5. Delete old .exe BEFORE build ----
 echo [4/6] Deleting old .exe...
-if exist "aquarium_app.exe" del /f /q "aquarium_app.exe"
-python -c "import os; os.path.exists('\u0410\u043a\u0432\u0430\u0423\u0447\u0451\u0442.exe') and os.remove('\u0410\u043a\u0432\u0430\u0423\u0447\u0451\u0442.exe')"
+if exist "aquarium_app\aquarium_app.exe" del /f /q "aquarium_app\aquarium_app.exe"
+python -c "import os; p='aquarium_app\\\u0410\u043a\u0432\u0430\u0423\u0447\u0451\u0442.exe'; os.path.exists(p) and os.remove(p)"
 echo Done.
 echo.
 
@@ -89,15 +89,16 @@ echo.
 echo Build completed.
 echo.
 
-REM ---- 8. Move and rename .exe ----
+REM ---- 8. Move and rename .exe to aquarium_app\ ----
 if not exist "dist\aquarium_app.exe" (
     echo [ERROR] dist\aquarium_app.exe not found after build.
     pause
     exit /b 1
 )
 
-move /y "dist\aquarium_app.exe" "." >nul
-python -c "import os; os.replace('aquarium_app.exe', '\u0410\u043a\u0432\u0430\u0423\u0447\u0451\u0442.exe')"
+if not exist "aquarium_app" mkdir "aquarium_app"
+move /y "dist\aquarium_app.exe" "aquarium_app\" >nul
+python -c "import os; os.replace('aquarium_app\\aquarium_app.exe', 'aquarium_app\\\u0410\u043a\u0432\u0430\u0423\u0447\u0451\u0442.exe')"
 
 REM ---- 9. Cleanup ----
 if exist "build" rmdir /s /q "build"
@@ -115,6 +116,8 @@ echo Done.
 echo.
 echo ============================================================
 echo   DONE!
+echo.
+echo   Exe: aquarium_app\АкваУчёт.exe
 echo.
 echo   If icon still looks OLD in Explorer:
 echo     1. Press F5 in Explorer to refresh

@@ -133,12 +133,12 @@ class App(
         self._nav_items = [
             ("📊", "Сводка", self.tab_dashboard),
             ("📋", "Журнал", self.tab_journal),
-            ("⚙", "Аквариумы", self.tab_aquariums),
-            ("🌿", "Удобрения", self.tab_ferts),
             ("💧", "Дозирование", self.tab_dosing),
             ("🧪", "Показания", self.tab_readings),
             ("⏰", "Таймеры", self.tab_timers),
             ("🔁", "Процессы", self.tab_processes),
+            ("⚙", "Аквариумы", self.tab_aquariums),
+            ("🌿", "Удобрения", self.tab_ferts),
         ]
         self._nav_buttons: dict = {}
         nav_wrap = tk.Frame(self.sidebar, bg=COLOR_SIDEBAR)
