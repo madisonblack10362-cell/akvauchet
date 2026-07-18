@@ -9,7 +9,7 @@ from aquarium_app.config import (
     COLOR_BG, COLOR_CARD, COLOR_ACCENT, COLOR_BORDER, COLOR_TEXT,
     COLOR_TEXT_MUTED, COLOR_TEXT_SOFT, COLOR_OK_TEXT, COLOR_OK_BG,
     COLOR_ACCENT_SOFT, COLOR_WARN, COLOR_WARN_TEXT, ELEMENTS, ELEMENT_FORMULA,
-    ELEMENT_RU, COLOR_ALT_ROW, COLOR_HEADER_TEXT,
+    ELEMENT_RU, COLOR_ALT_ROW, COLOR_HEADER_TEXT, ELEMENT_KEYS,
     MEASURED_PARAMS,
 )
 from aquarium_app.db import get_aquariums, get_aquarium
@@ -159,7 +159,7 @@ class DashboardTab:
         bar_label = (f"Внесено за 7 дней ({week_start.strftime('%d.%m')} - "
                      f"{week_end.strftime('%d.%m')}):")
         tk.Label(card, text=bar_label, font=(FF, 9, "bold"),
-                 bg=COLOR_CARD, fg=COLOR_ACCENT_SOFT).pack(anchor="w", pady=(6, 2))
+                 bg=COLOR_CARD, fg=COLOR_TEXT_SOFT).pack(anchor="w", pady=(6, 2))
 
         bar_canvas = tk.Canvas(card, bg=COLOR_CARD, highlightthickness=0, height=28)
         bar_canvas.pack(fill="x", pady=(0, 4))
@@ -171,17 +171,20 @@ class DashboardTab:
         if items:
             schedule_chart_draw(bar_canvas, draw_element_bars, items, font_family=self.FF)
 
-        # --- соотношения элементов (из последних замеров, не из доз!) ---
+        # --- соотношения элементов ---
+        # Гибрид: замеренные параметры (po4, no3) берём из показаний воды,
+        # остальные (k, fe, mn) — из сумм внесённых удобрений за неделю.
         ratio_vals = {}
         if readings:
             latest = readings[0]
-            # MEASURED_PARAMS: po4, no3, ph — добавляем fe/mn для Fe:Mn
-            ratio_keys = {k for k, _, _ in MEASURED_PARAMS}
-            ratio_keys.update(["fe", "mn"])
-            for key in ratio_keys:
+            for key, _, _ in MEASURED_PARAMS:
                 v = latest.get(key)
                 if v is not None and v > 0:
                     ratio_vals[key] = v
+        # дополняем из доз то, что не замерено
+        for ek in ELEMENT_KEYS:
+            if ek not in ratio_vals and totals.get(ek, 0) > 0:
+                ratio_vals[ek] = totals[ek]
         ratios = compute_element_ratios(ratio_vals) if ratio_vals else []
         if ratios:
             ratio_frame = tk.Frame(card, bg=COLOR_CARD)
