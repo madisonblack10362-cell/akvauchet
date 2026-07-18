@@ -169,7 +169,7 @@ class DashboardTab:
                         tk.Label(row, text=trend_txt, font=(FF, 9),
                                  bg=COLOR_CARD, fg=trend_clr).pack(side="left", padx=(4, 0))
 
-            # --- статусы отклонений ---
+            # --- правая колонка: статусы + расход + дозировка ---
             values = {key: latest.get(key) for key, _, _ in MEASURED_PARAMS}
             flags = out_of_range_flags(self.conn, aq_id, values)
             if flags:
@@ -180,6 +180,40 @@ class DashboardTab:
             else:
                 tk.Label(right_col, text="  Все параметры в норме", font=(FF, 9),
                          bg=COLOR_OK_BG, fg=COLOR_OK_TEXT, padx=6, pady=3).pack(fill="x")
+
+            # расход (плашка в стиле статусов)
+            consumed_parts = []
+            if prev:
+                for key, label, unit in MEASURED_PARAMS:
+                    v = latest.get(key)
+                    pv = prev.get(key)
+                    if v is not None and pv is not None:
+                        diff = pv - v
+                        if diff > 0.01:
+                            consumed_parts.append(f"{label} -{diff:g}{unit}")
+            if consumed_parts:
+                cons_frame = tk.Frame(right_col, bg="#1c1f2e", padx=6, pady=3)
+                cons_frame.pack(fill="x", pady=(4, 0))
+                tk.Label(cons_frame, text="Расход", font=(FF, 8),
+                         bg="#1c1f2e", fg=COLOR_TEXT_MUTED).pack(anchor="w")
+                tk.Label(cons_frame, text=", ".join(consumed_parts), font=(FF, 9),
+                         bg="#1c1f2e", fg="#e88a8a").pack(anchor="w")
+
+            # последняя дозировка (плашка в стиле статусов)
+            dosing_rows = get_dosing(self.conn, aq_id)
+            if dosing_rows:
+                d = dosing_rows[0]
+                fert_name = d["fert_name"] or "Удобрение"
+                dose_val = d["dose"]
+                date_s = from_iso(d["date"])
+                dose_frame = tk.Frame(right_col, bg="#1c1f2e", padx=6, pady=3)
+                dose_frame.pack(fill="x", pady=(4, 0))
+                tk.Label(dose_frame, text="Дозировка", font=(FF, 8),
+                         bg="#1c1f2e", fg=COLOR_TEXT_MUTED).pack(anchor="w")
+                tk.Label(dose_frame, text=f"{fert_name} {dose_val:g} мл",
+                         font=(FF, 9, "bold"), bg="#1c1f2e", fg=COLOR_ACCENT).pack(side="left")
+                tk.Label(dose_frame, text=f"  — {date_s}",
+                         font=(FF, 9), bg="#1c1f2e", fg=COLOR_TEXT_MUTED).pack(side="left")
         else:
             tk.Label(left_col, text="Замеров пока нет", font=(FF, 9),
                      bg=COLOR_CARD, fg=COLOR_TEXT_MUTED).pack(anchor="w")
@@ -189,9 +223,6 @@ class DashboardTab:
 
         # --- внесено за неделю ---
         self._build_weekly_dose_bars(card, aq_id)
-
-        # --- последняя дозировка + расход ---
-        self._build_dose_consumed_line(card, aq_id, readings)
 
     # ------------------------------------------------------------------
     # Блок подмены воды (прогресс-бар с заливкой по %)
@@ -313,45 +344,3 @@ class DashboardTab:
         if items:
             schedule_chart_draw(bar_canvas, draw_element_bars, items, font_family=self.FF)
 
-    # ------------------------------------------------------------------
-    # Последняя дозировка + израсходовано
-    # ------------------------------------------------------------------
-
-    def _build_dose_consumed_line(self, card, aq_id, readings):
-        FF = self.FF
-
-        info_frame = tk.Frame(card, bg=COLOR_CARD)
-        info_frame.pack(fill="x", pady=(6, 0))
-
-        # --- израсходовано: для параметров что упали ---
-        consumed_parts = []
-        if readings and len(readings) > 1:
-            latest = readings[0]
-            prev = readings[1]
-            for key, label, unit in MEASURED_PARAMS:
-                v = latest.get(key)
-                pv = prev.get(key)
-                if v is not None and pv is not None:
-                    diff = pv - v  # положительное = расход
-                    if diff > 0.01:
-                        consumed_parts.append(f"{label} -{diff:g}{unit}")
-
-        if consumed_parts:
-            row = tk.Frame(info_frame, bg=COLOR_CARD)
-            row.pack(fill="x")
-            tk.Label(row, text="Расход: ", font=(FF, 9),
-                     bg=COLOR_CARD, fg=COLOR_TEXT_MUTED).pack(side="left")
-            tk.Label(row, text=", ".join(consumed_parts), font=(FF, 9),
-                     bg=COLOR_CARD, fg="#e88a8a").pack(side="left")
-
-        # --- последняя дозировка ---
-        dosing_rows = get_dosing(self.conn, aq_id)
-        if dosing_rows:
-            d = dosing_rows[0]
-            fert_name = d["fert_name"] or "Удобрение"
-            dose_val = d["dose"]
-            date_s = from_iso(d["date"])
-            row = tk.Frame(info_frame, bg=COLOR_CARD)
-            row.pack(fill="x", pady=(2, 0))
-            tk.Label(row, text=f"Дозировка: {fert_name} {dose_val:g} мл — {date_s}",
-                     font=(FF, 9), bg=COLOR_CARD, fg=COLOR_ACCENT).pack(side="left")
