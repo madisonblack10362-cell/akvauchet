@@ -1,28 +1,36 @@
-"""Вкладка «Обзор» — сводная информация по всем аквариумам."""
+"""Вкладка «Обзор» — оперативный дашборд по всем аквариумам.
+
+Логика Сводки уникальна и НЕ дублирует другие вкладки:
+- Показания: подробный трендовый график + таблица всех замеров
+- Дозирование: журнал дозировок, график тренда по дням/нарастающий, калькулятор
+
+Сводка отвечает на вопрос «что происходит сейчас и что нужно сделать»:
+1. Последний замер + отклонения от целевых диапазонов
+2. Тренды параметров (↑↓→) за последние 2 замера — растёт/падает/стабильно
+3. Подмена воды: дней до следующей + краткая статистика
+4. Последняя активность: хронология (замер / дозировка / подмена)
+"""
 
 from __future__ import annotations
 
+import datetime as dt
 import tkinter as tk
 from tkinter import ttk
 
 from aquarium_app.config import (
     COLOR_BG, COLOR_CARD, COLOR_ACCENT, COLOR_BORDER, COLOR_TEXT,
     COLOR_TEXT_MUTED, COLOR_TEXT_SOFT, COLOR_OK_TEXT, COLOR_OK_BG,
-    COLOR_ACCENT_SOFT, COLOR_WARN, COLOR_WARN_TEXT, ELEMENTS, ELEMENT_FORMULA,
-    ELEMENT_RU, COLOR_ALT_ROW, COLOR_HEADER_TEXT, ELEMENT_KEYS,
+    COLOR_ACCENT_SOFT, COLOR_WARN, COLOR_WARN_TEXT,
+    COLOR_STATUS_WAITING,
     MEASURED_PARAMS,
 )
-from aquarium_app.db import get_aquariums, get_aquarium
-from aquarium_app.logic.calculations import (
-    sum_last_n_days, compute_element_ratios, out_of_range_flags,
-)
+from aquarium_app.db import get_aquariums, get_aquarium, get_readings, get_dosing
+from aquarium_app.logic.calculations import out_of_range_flags
 from aquarium_app.logic.formatters import from_iso
-from aquarium_app.gui.charts import draw_element_bars, schedule_chart_draw
-from aquarium_app.db import get_water_change_stats
 
 
 class DashboardTab:
-    """Миксин-вкладка «Обзор»."""
+    """Миксин-вкладка «Обзор» — оперативный дашборд."""
 
     def build_dashboard_tab(self):
         tab = self.tab_dashboard
@@ -83,6 +91,10 @@ class DashboardTab:
         container.update_idletasks()
         self.dash_canvas.configure(scrollregion=self.dash_canvas.bbox("all"))
 
+    # ------------------------------------------------------------------
+    # Карточка аквариума
+    # ------------------------------------------------------------------
+
     def _build_aquarium_card(self, parent, aq):
         FF = self.FF
         aq_id = aq["id"]
@@ -105,7 +117,7 @@ class DashboardTab:
         tk.Label(hdr, text="  |  ".join(info_parts), font=(FF, 9),
                  bg=COLOR_CARD, fg=COLOR_TEXT_MUTED).pack(side="right")
 
-        # два столбца: замеры + статусы
+        # --- два столбца: замеры + статусы ---
         two_col = tk.Frame(card, bg=COLOR_CARD)
         two_col.pack(fill="x", pady=(0, 6))
 
@@ -115,13 +127,14 @@ class DashboardTab:
         right_col = tk.Frame(two_col, bg=COLOR_CARD)
         right_col.pack(side="left", fill="both", expand=True, padx=(12, 0))
 
-        # --- последние замеры ---
-        from aquarium_app.db import get_readings
+        # --- последние замеры с трендами ---
         readings = get_readings(self.conn, aq_id)
         if readings:
             latest = readings[0]
+            prev = readings[1] if len(readings) > 1 else None
+
             tk.Label(left_col, text="Последний замер", font=(FF, 9, "bold"),
-                     bg=COLOR_CARD, fg=COLOR_TEXT_SOFT).pack(anchor="w")
+                     bg=COLOR_CARD, fg=COLOR_TEXT).pack(anchor="w")
             tk.Label(left_col, text=from_iso(latest["date"]), font=(FF, 9),
                      bg=COLOR_CARD, fg=COLOR_TEXT_MUTED).pack(anchor="w", pady=(0, 4))
 
@@ -131,12 +144,31 @@ class DashboardTab:
                     unit_s = f" {unit}" if unit else ""
                     row = tk.Frame(left_col, bg=COLOR_CARD)
                     row.pack(fill="x", pady=1)
+
+                    # название параметра
                     tk.Label(row, text=f"{label}:", font=(FF, 9),
-                             bg=COLOR_CARD, fg=COLOR_TEXT_MUTED, width=14, anchor="w").pack(side="left")
-                    tk.Label(row, text=f"{v:g}{unit_s}", font=(FF, 9, "bold"),
+                             bg=COLOR_CARD, fg=COLOR_TEXT_MUTED, width=8, anchor="w").pack(side="left")
+
+                    # значение
+                    tk.Label(row, text=f"{v:g}{unit_s}", font=(FF, 10, "bold"),
                              bg=COLOR_CARD, fg=COLOR_TEXT).pack(side="left")
 
-            # статусы
+                    # тренд: стрелка + разница по сравнению с предыдущим замером
+                    if prev and prev.get(key) is not None:
+                        pv = prev[key]
+                        diff = v - pv
+                        if abs(diff) < 0.01:
+                            trend_txt, trend_clr = " ->", COLOR_TEXT_MUTED
+                        elif diff > 0:
+                            trend_txt = f" +{diff:g}"
+                            trend_clr = COLOR_OK_TEXT if key == "no3" else COLOR_WARN_TEXT
+                        else:
+                            trend_txt = f" {diff:g}"
+                            trend_clr = COLOR_OK_TEXT if key != "no3" else COLOR_WARN_TEXT
+                        tk.Label(row, text=trend_txt, font=(FF, 9),
+                                 bg=COLOR_CARD, fg=trend_clr).pack(side="left", padx=(4, 0))
+
+            # --- статусы отклонений ---
             values = {key: latest.get(key) for key, _, _ in MEASURED_PARAMS}
             flags = out_of_range_flags(self.conn, aq_id, values)
             if flags:
@@ -151,121 +183,145 @@ class DashboardTab:
             tk.Label(left_col, text="Замеров пока нет", font=(FF, 9),
                      bg=COLOR_CARD, fg=COLOR_TEXT_MUTED).pack(anchor="w")
 
-        # --- бары элементов за неделю (скользящие 7 дней, как в Дозировании) ---
-        import datetime as _dt
-        week_end = _dt.date.today()
-        week_start = week_end - _dt.timedelta(days=7)
-        totals = sum_last_n_days(self.conn, aq_id, 7)
-        bar_label = (f"Внесено за 7 дней ({week_start.strftime('%d.%m')} - "
-                     f"{week_end.strftime('%d.%m')}):")
-        tk.Label(card, text=bar_label, font=(FF, 9, "bold"),
-                 bg=COLOR_CARD, fg=COLOR_TEXT_SOFT).pack(anchor="w", pady=(6, 2))
+        # --- подмена воды: дней до следующей + краткая статистика ---
+        self._build_water_change_block(card, aq_id, readings)
 
-        bar_canvas = tk.Canvas(card, bg=COLOR_CARD, highlightthickness=0, height=28)
-        bar_canvas.pack(fill="x", pady=(0, 4))
-        items = []
-        for ek, formula, ru in ELEMENTS:
-            v = totals.get(ek, 0.0)
-            if v > 0:
-                items.append((ru, formula, v))
-        if items:
-            schedule_chart_draw(bar_canvas, draw_element_bars, items, font_family=self.FF)
+        # --- последняя активность ---
+        self._build_activity_line(card, aq_id, readings)
 
-        # --- соотношения элементов ---
-        # Гибрид: замеренные параметры (po4, no3) берём из показаний воды,
-        # остальные (k, fe, mn) — из сумм внесённых удобрений за неделю.
-        ratio_vals = {}
-        if readings:
-            latest = readings[0]
-            for key, _, _ in MEASURED_PARAMS:
-                v = latest.get(key)
-                if v is not None and v > 0:
-                    ratio_vals[key] = v
-        # дополняем из доз то, что не замерено
-        for ek in ELEMENT_KEYS:
-            if ek not in ratio_vals and totals.get(ek, 0) > 0:
-                ratio_vals[ek] = totals[ek]
-        ratios = compute_element_ratios(ratio_vals) if ratio_vals else []
-        if ratios:
-            ratio_frame = tk.Frame(card, bg=COLOR_CARD)
-            ratio_frame.pack(fill="x", pady=(4, 2))
-            tk.Label(ratio_frame, text="Соотношения:", font=(FF, 9, "bold"),
-                     bg=COLOR_CARD, fg=COLOR_TEXT_SOFT).pack(anchor="w")
-            for r in ratios:
-                row = tk.Frame(ratio_frame, bg=COLOR_CARD)
-                row.pack(fill="x", pady=1)
-                if r["ratio"] is not None:
-                    if r["status"] == "ok":
-                        clr = COLOR_OK_TEXT
-                        note_s = ""
-                    else:
-                        clr = COLOR_WARN_TEXT
-                        note_s = f" - {r['note']}" if r.get("note") else ""
-                    txt = f"{r['label']}: {r['ratio']:.1f} (норма {r['lo']:.0f}-{r['hi']:.0f}){note_s}"
-                else:
-                    clr = COLOR_TEXT_MUTED
-                    txt = f"{r['label']}: недостаточно данных"
-                tk.Label(row, text=txt, font=(FF, 9), bg=COLOR_CARD, fg=clr,
-                         anchor="w", wraplength=500, justify="left").pack(anchor="w")
+    # ------------------------------------------------------------------
+    # Блок подмены воды (компактный, с прогнозом)
+    # ------------------------------------------------------------------
 
-        # --- индикатор подмены воды (за неделю) ---
-        wc_stats = get_water_change_stats(self.conn, aq_id, days=7)
+    def _build_water_change_block(self, card, aq_id, readings):
+        FF = self.FF
 
         wc_frame = tk.Frame(card, bg=COLOR_ACCENT_SOFT, highlightbackground=COLOR_ACCENT,
                             highlightthickness=1)
-        wc_frame.pack(fill="x", pady=(8, 0))
+        wc_frame.pack(fill="x", pady=(6, 0))
 
-        wc_hdr = tk.Frame(wc_frame, bg=COLOR_ACCENT_SOFT)
-        wc_hdr.pack(fill="x", padx=10, pady=(8, 2))
-        tk.Label(wc_hdr, text="💧", font=(FF, 12),
-                 bg=COLOR_ACCENT_SOFT, fg=COLOR_TEXT).pack(side="left")
-        tk.Label(wc_hdr, text="  Подмена воды", font=(FF, 10, "bold"),
-                 bg=COLOR_ACCENT_SOFT, fg=COLOR_ACCENT).pack(side="left")
+        wc_row = tk.Frame(wc_frame, bg=COLOR_ACCENT_SOFT)
+        wc_row.pack(fill="x", padx=10, pady=8)
 
-        if wc_stats["count"] > 0:
-            wc_body = tk.Frame(wc_frame, bg=COLOR_ACCENT_SOFT)
-            wc_body.pack(fill="x", padx=10, pady=(0, 4))
+        # находим последнюю подмену из readings
+        last_wc_date = None
+        last_wc_pct = None
+        for r in (readings or []):
+            if r.get("water_change_pct") is not None or r.get("water_change_l") is not None:
+                last_wc_date = r["date"]
+                last_wc_pct = r.get("water_change_pct")
+                if last_wc_pct is None and r.get("water_change_l"):
+                    aq = get_aquarium(self.conn, aq_id)
+                    vol = aq["volume_l"] if aq else 0
+                    if vol and vol > 0:
+                        last_wc_pct = round(r["water_change_l"] / vol * 100, 1)
+                break
 
-            # последняя подмена — главное число (всегда в %)
-            if wc_stats["last_pct"] is not None:
-                last_txt = f"Последняя: {wc_stats['last_pct']:.1f}%"
-            else:
-                last_txt = ""
-            tk.Label(wc_body, text=last_txt,
-                     font=(FF, 11, "bold"), bg=COLOR_ACCENT_SOFT,
-                     fg=COLOR_TEXT).pack(side="left")
+        # рассчитываем дней до следующей подмены
+        days_since = None
+        days_until = None
+        if last_wc_date:
+            try:
+                wc_d = dt.date.fromisoformat(last_wc_date)
+                days_since = (dt.date.today() - wc_d).days
+                # рекомендации: при 30% подмене — раз в 5-7 дней, при 50% — раз в 7-10
+                if last_wc_pct and last_wc_pct >= 30:
+                    interval = max(4, int(10 - last_wc_pct / 10))  # 30% -> 7 дн, 50% -> 5 дн
+                    days_until = max(0, interval - days_since)
+                else:
+                    interval = 7
+                    days_until = max(0, interval - days_since)
+            except (ValueError, TypeError):
+                pass
 
-            if wc_stats["last_date"]:
-                tk.Label(wc_body, text=f"  {from_iso(wc_stats['last_date'])}",
-                         font=(FF, 10), bg=COLOR_ACCENT_SOFT,
-                         fg=COLOR_TEXT_MUTED).pack(side="left")
+        # левая часть: статус
+        left = tk.Frame(wc_row, bg=COLOR_ACCENT_SOFT)
+        left.pack(side="left", fill="both", expand=True)
 
-            # итог за неделю
-            wc_summary = tk.Frame(wc_frame, bg=COLOR_ACCENT_SOFT)
-            wc_summary.pack(fill="x", padx=10, pady=(0, 8))
-            parts = [f"{wc_stats['count']} раз за 7 дн"]
-            if wc_stats["total_pct"] > 0:
-                parts.append(f"итого {wc_stats['total_pct']:.0f}% объёма")
-            tk.Label(wc_summary, text="  |  ".join(parts),
-                     font=(FF, 9), bg=COLOR_ACCENT_SOFT,
-                     fg=COLOR_TEXT_MUTED).pack(anchor="w")
-
-            # индикатор достаточности
-            if wc_stats["total_pct"] < 30:
-                wc_tip = "  ⚠ Мало подмен — рекомендуется от 30% в неделю"
-                tip_clr = COLOR_WARN_TEXT
-            elif wc_stats["total_pct"] >= 50:
-                wc_tip = "  ✓ Подмены в норме"
-                tip_clr = COLOR_OK_TEXT
-            else:
-                wc_tip = ""
-                tip_clr = COLOR_TEXT_MUTED
-            if wc_tip:
-                tip_row = tk.Frame(wc_frame, bg=COLOR_ACCENT_SOFT)
-                tip_row.pack(fill="x", padx=10, pady=(0, 8))
-                tk.Label(tip_row, text=wc_tip, font=(FF, 9),
-                         bg=COLOR_ACCENT_SOFT, fg=tip_clr).pack(anchor="w")
+        if last_wc_date:
+            pct_str = f" {last_wc_pct:.0f}%" if last_wc_pct else ""
+            wc_main = f"Подмена{pct_str} — {from_iso(last_wc_date)}"
+            if days_since is not None:
+                if days_since == 0:
+                    wc_main += " (сегодня)"
+                elif days_since == 1:
+                    wc_main += " (вчера)"
+                else:
+                    wc_main += f" ({days_since} дн. назад)"
+            tk.Label(left, text=wc_main, font=(FF, 9),
+                     bg=COLOR_ACCENT_SOFT, fg=COLOR_TEXT).pack(anchor="w")
         else:
-            tk.Label(wc_frame, text="  Подмен не было неделю — пора!",
-                     font=(FF, 10), bg=COLOR_ACCENT_SOFT,
-                     fg=COLOR_WARN_TEXT).pack(anchor="w", padx=10, pady=(0, 8))
+            tk.Label(left, text="Подмен ещё не было", font=(FF, 9),
+                     bg=COLOR_ACCENT_SOFT, fg=COLOR_TEXT_MUTED).pack(anchor="w")
+
+        # правая часть: дней до следующей / предупреждение
+        right = tk.Frame(wc_row, bg=COLOR_ACCENT_SOFT)
+        right.pack(side="right")
+
+        if days_until is not None:
+            if days_until <= 0:
+                hint, hclr = "Пора подменять!", COLOR_WARN_TEXT
+            elif days_until == 1:
+                hint, hclr = "Завтра подмена", COLOR_STATUS_WAITING
+            elif days_until <= 3:
+                hint, hclr = f"Через {days_until} дн.", COLOR_TEXT_MUTED
+            else:
+                hint, hclr = f"Через {days_until} дн.", COLOR_TEXT_MUTED
+            tk.Label(right, text=hint, font=(FF, 10, "bold"),
+                     bg=COLOR_ACCENT_SOFT, fg=hclr).pack(anchor="e")
+        elif not last_wc_date:
+            tk.Label(right, text="Пора подменять!", font=(FF, 10, "bold"),
+                     bg=COLOR_ACCENT_SOFT, fg=COLOR_WARN_TEXT).pack(anchor="e")
+
+    # ------------------------------------------------------------------
+    # Последняя активность — хронология из 3 событий
+    # ------------------------------------------------------------------
+
+    def _build_activity_line(self, card, aq_id, readings):
+        FF = self.FF
+
+        act_frame = tk.Frame(card, bg=COLOR_CARD)
+        act_frame.pack(fill="x", pady=(8, 0))
+
+        tk.Label(act_frame, text="Последняя активность", font=(FF, 9, "bold"),
+                 bg=COLOR_CARD, fg=COLOR_TEXT_MUTED).pack(anchor="w", pady=(0, 3))
+
+        events = []
+
+        # последний замер
+        if readings:
+            events.append((readings[0]["date"], "Замер", COLOR_TEXT))
+
+        # последняя дозировка
+        dosing_rows = get_dosing(self.conn, aq_id)
+        if dosing_rows:
+            d = dosing_rows[0]
+            fert_name = d["fert_name"] or "Удобрение"
+            events.append((d["date"], f"Дозировка: {fert_name}", COLOR_ACCENT))
+
+        # последняя подмена (из readings)
+        for r in (readings or []):
+            if r.get("water_change_pct") is not None or r.get("water_change_l") is not None:
+                events.append((r["date"], "Подмена воды", COLOR_OK_TEXT))
+                break
+
+        # сортируем по дате (убывание) и берём 3 свежих
+        events.sort(key=lambda e: e[0], reverse=True)
+        events = events[:3]
+
+        if not events:
+            tk.Label(act_frame, text="  Нет записей", font=(FF, 9),
+                     bg=COLOR_CARD, fg=COLOR_TEXT_MUTED).pack(anchor="w")
+            return
+
+        row = tk.Frame(act_frame, bg=COLOR_CARD)
+        row.pack(fill="x")
+
+        for i, (date_iso, text, clr) in enumerate(events):
+            if i > 0:
+                tk.Label(row, text="  >  ", font=(FF, 9),
+                         bg=COLOR_CARD, fg=COLOR_BORDER).pack(side="left")
+            date_s = from_iso(date_iso)
+            lbl_text = f"{date_s}  {text}"
+            tk.Label(row, text=lbl_text, font=(FF, 9),
+                     bg=COLOR_CARD, fg=clr).pack(side="left")
