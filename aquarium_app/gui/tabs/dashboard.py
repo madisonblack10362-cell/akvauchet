@@ -168,8 +168,15 @@ class DashboardTab:
         if items:
             schedule_chart_draw(bar_canvas, draw_element_bars, items, font_family=self.FF)
 
-        # --- соотношения элементов ---
-        ratios = compute_element_ratios(totals)
+        # --- соотношения элементов (из последних замеров, не из доз!) ---
+        ratio_vals = {}
+        if readings:
+            latest = readings[0]
+            for key, _, _ in MEASURED_PARAMS:
+                v = latest.get(key)
+                if v is not None and v > 0:
+                    ratio_vals[key] = v
+        ratios = compute_element_ratios(ratio_vals) if ratio_vals else []
         if ratios:
             ratio_frame = tk.Frame(card, bg=COLOR_CARD)
             ratio_frame.pack(fill="x", pady=(4, 2))
