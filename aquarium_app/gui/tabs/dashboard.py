@@ -27,7 +27,7 @@ from aquarium_app.config import (
 from aquarium_app.db import get_aquariums, get_aquarium, get_readings, get_dosing
 from aquarium_app.logic.calculations import out_of_range_flags, sum_last_n_days
 from aquarium_app.logic.formatters import from_iso
-from aquarium_app.gui.charts import draw_element_bars, schedule_chart_draw, _element_color
+from aquarium_app.gui.charts import draw_element_bars, schedule_chart_draw
 
 
 class DashboardTab:
@@ -75,14 +75,13 @@ class DashboardTab:
 
     @staticmethod
     def _fert_color(dosing_row):
-        """Цвет удобрения по его основному элементу."""
-        # приоритет: макро > железо > микро > дефолт
+        """Цвет удобрения по его основному элементу (из ELEMENT_COLORS)."""
         for key in ("f_no3", "f_po4", "f_k", "f_mg", "f_ca"):
             if dosing_row.get(key):
-                return _element_color(key[2:].upper())
+                return ELEMENT_COLORS.get(key[2:], COLOR_ACCENT)
         for key in ("f_fe", "f_mn", "f_b", "f_zn", "f_cu", "f_mo", "f_co"):
             if dosing_row.get(key):
-                return _element_color(key[2:].upper())
+                return ELEMENT_COLORS.get(key[2:], COLOR_ACCENT)
         return COLOR_ACCENT
 
     def refresh_dashboard(self):
