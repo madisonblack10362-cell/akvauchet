@@ -18,15 +18,16 @@ import tkinter as tk
 from tkinter import ttk
 
 from aquarium_app.config import (
-    COLOR_BG, COLOR_CARD, COLOR_ACCENT, COLOR_BORDER, COLOR_TEXT,
+    COLOR_BG, COLOR_CARD, COLOR_ACCENT, COLOR_ALT_ROW, COLOR_BORDER, COLOR_TEXT,
     COLOR_TEXT_MUTED, COLOR_TEXT_SOFT, COLOR_OK_TEXT, COLOR_OK_BG,
     COLOR_ACCENT_SOFT, COLOR_WARN, COLOR_WARN_TEXT,
-    COLOR_STATUS_WAITING,
+    COLOR_STATUS_WAITING, ELEMENTS,
     MEASURED_PARAMS,
 )
 from aquarium_app.db import get_aquariums, get_aquarium, get_readings, get_dosing
-from aquarium_app.logic.calculations import out_of_range_flags
+from aquarium_app.logic.calculations import out_of_range_flags, sum_last_n_days
 from aquarium_app.logic.formatters import from_iso
+from aquarium_app.gui.charts import draw_element_bars, schedule_chart_draw
 
 
 class DashboardTab:
@@ -186,6 +187,9 @@ class DashboardTab:
         # --- подмена воды: дней до следующей + краткая статистика ---
         self._build_water_change_block(card, aq_id, readings)
 
+        # --- внесено за неделю ---
+        self._build_weekly_dose_bars(card, aq_id)
+
         # --- последняя активность ---
         self._build_activity_line(card, aq_id, readings)
 
@@ -272,6 +276,31 @@ class DashboardTab:
         elif not last_wc_date:
             tk.Label(right, text="Пора подменять!", font=(FF, 10, "bold"),
                      bg=COLOR_ACCENT_SOFT, fg=COLOR_WARN_TEXT).pack(anchor="e")
+
+    # ------------------------------------------------------------------
+    # Внесено за неделю — горизонтальные бары
+    # ------------------------------------------------------------------
+
+    def _build_weekly_dose_bars(self, card, aq_id):
+        FF = self.FF
+        totals = sum_last_n_days(self.conn, aq_id, 7)
+
+        week_end = dt.date.today()
+        week_start = week_end - dt.timedelta(days=7)
+        bar_label = (f"Внесено за 7 дней ({week_start.strftime('%d.%m')} - "
+                     f"{week_end.strftime('%d.%m')}):")
+        tk.Label(card, text=bar_label, font=(FF, 9, "bold"),
+                 bg=COLOR_CARD, fg=COLOR_TEXT).pack(anchor="w", pady=(6, 2))
+
+        bar_canvas = tk.Canvas(card, bg=COLOR_CARD, highlightthickness=0, height=28)
+        bar_canvas.pack(fill="x", pady=(0, 4))
+        items = []
+        for ek, formula, ru in ELEMENTS:
+            v = totals.get(ek, 0.0)
+            if v > 0:
+                items.append((ru, formula, v))
+        if items:
+            schedule_chart_draw(bar_canvas, draw_element_bars, items, font_family=self.FF)
 
     # ------------------------------------------------------------------
     # Последняя активность — хронология из 3 событий
