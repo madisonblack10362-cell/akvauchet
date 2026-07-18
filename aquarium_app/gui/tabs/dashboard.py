@@ -20,12 +20,12 @@ from tkinter import ttk
 from aquarium_app.config import (
     COLOR_BG, COLOR_CARD, COLOR_ACCENT, COLOR_ALT_ROW, COLOR_BORDER, COLOR_TEXT,
     COLOR_TEXT_MUTED, COLOR_TEXT_SOFT, COLOR_OK_TEXT, COLOR_OK_BG,
-    COLOR_WARN, COLOR_WARN_TEXT,
+    COLOR_WARN, COLOR_WARN_TEXT, ELEMENT_COLORS,
     COLOR_STATUS_WAITING, ELEMENTS,
     MEASURED_PARAMS,
 )
 from aquarium_app.db import get_aquariums, get_aquarium, get_readings, get_dosing
-from aquarium_app.logic.calculations import sum_last_n_days
+from aquarium_app.logic.calculations import out_of_range_flags, sum_last_n_days
 from aquarium_app.logic.formatters import from_iso
 from aquarium_app.gui.charts import draw_element_bars, schedule_chart_draw, _element_color
 
@@ -155,16 +155,17 @@ class DashboardTab:
                 v = latest.get(key)
                 if v is not None:
                     unit_s = f" {unit}" if unit else ""
+                    param_clr = ELEMENT_COLORS.get(key, COLOR_TEXT)
                     row = tk.Frame(left_col, bg=COLOR_CARD)
                     row.pack(fill="x", pady=1)
 
                     # название параметра
                     tk.Label(row, text=f"{label}:", font=(FF, 9),
-                             bg=COLOR_CARD, fg=COLOR_TEXT_MUTED, width=8, anchor="w").pack(side="left")
+                             bg=COLOR_CARD, fg=param_clr, width=8, anchor="w").pack(side="left")
 
                     # значение
                     tk.Label(row, text=f"{v:g}{unit_s}", font=(FF, 10, "bold"),
-                             bg=COLOR_CARD, fg=COLOR_TEXT).pack(side="left")
+                             bg=COLOR_CARD, fg=param_clr).pack(side="left")
 
                     # тренд: стрелка + разница по сравнению с предыдущим замером
                     if prev and prev.get(key) is not None:
@@ -212,6 +213,19 @@ class DashboardTab:
 
         # --- внесено за неделю ---
         self._build_weekly_dose_bars(card, aq_id)
+
+        # --- отклонения параметров (внизу карточки) ---
+        if readings:
+            latest = readings[0]
+            values = {key: latest.get(key) for key, _, _ in MEASURED_PARAMS}
+            flags = out_of_range_flags(self.conn, aq_id, values)
+            if flags:
+                flags_frame = tk.Frame(card, bg=COLOR_CARD)
+                flags_frame.pack(fill="x", pady=(4, 0))
+                for flag in flags:
+                    tk.Label(flags_frame, text=f"  {flag}", font=(FF, 9),
+                             bg=COLOR_WARN, fg=COLOR_WARN_TEXT, anchor="w",
+                             padx=6, pady=3).pack(fill="x", pady=1)
 
     # ------------------------------------------------------------------
     # Блок подмены воды (прогресс-бар с заливкой по %)
