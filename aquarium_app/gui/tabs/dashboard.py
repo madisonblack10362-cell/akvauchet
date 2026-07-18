@@ -79,10 +79,19 @@ class DashboardTab:
         for key in ("f_no3", "f_po4", "f_k", "f_mg", "f_ca"):
             if dosing_row.get(key):
                 return ELEMENT_COLORS.get(key[2:], COLOR_ACCENT)
+        # микро — отдельный бирюзовый цвет
         for key in ("f_fe", "f_mn", "f_b", "f_zn", "f_cu", "f_mo", "f_co"):
             if dosing_row.get(key):
-                return ELEMENT_COLORS.get(key[2:], COLOR_ACCENT)
+                return "#20c997"
         return COLOR_ACCENT
+
+    @staticmethod
+    def _fert_sort_key(dosing_row):
+        """Ключ сортировки: PO4, NO3, K, макро, микро."""
+        for i, key in enumerate(("f_po4", "f_no3", "f_k", "f_mg", "f_ca")):
+            if dosing_row.get(key):
+                return i
+        return 99  # микро — в конце
 
     def refresh_dashboard(self):
         container = self.dash_inner
@@ -186,21 +195,19 @@ class DashboardTab:
             if dosing_rows:
                 # берём все записи за последнюю дату дозирования
                 last_dose_date = dosing_rows[0]["date"]
-                last_doses = [d for d in dosing_rows if d["date"] == last_dose_date]
+                last_doses = sorted(
+                    [d for d in dosing_rows if d["date"] == last_dose_date],
+                    key=self._fert_sort_key,
+                )
                 date_s = from_iso(last_dose_date)
-                dose_frame = tk.Frame(right_col, bg="#1c1f2e", padx=6, pady=3)
-                dose_frame.pack(fill="x")
-                tk.Label(dose_frame, text=f"Дозировка — {date_s}", font=(FF, 8),
-                         bg="#1c1f2e", fg=COLOR_TEXT_MUTED).pack(anchor="w")
+                tk.Label(right_col, text=f"Дозировка — {date_s}", font=(FF, 8),
+                         bg=COLOR_CARD, fg=COLOR_TEXT_MUTED).pack(anchor="w", pady=(2, 0))
                 for d in last_doses:
                     fert_name = d["fert_name"] or "Удобрение"
                     dose_val = d["dose"]
-                    row = tk.Frame(dose_frame, bg="#1c1f2e")
-                    row.pack(fill="x")
-                    # цвет по основному элементу удобрения
                     elem_clr = self._fert_color(d)
-                    tk.Label(row, text=f"{fert_name} {dose_val:g} мл",
-                             font=(FF, 9, "bold"), bg="#1c1f2e", fg=elem_clr).pack(side="left")
+                    tk.Label(right_col, text=f"{fert_name} {dose_val:g} мл",
+                             font=(FF, 9, "bold"), bg=COLOR_CARD, fg=elem_clr).pack(anchor="w")
         else:
             tk.Label(left_col, text="Замеров пока нет", font=(FF, 9),
                      bg=COLOR_CARD, fg=COLOR_TEXT_MUTED).pack(anchor="w")
