@@ -181,24 +181,6 @@ class DashboardTab:
                 tk.Label(right_col, text="  Все параметры в норме", font=(FF, 9),
                          bg=COLOR_OK_BG, fg=COLOR_OK_TEXT, padx=6, pady=3).pack(fill="x")
 
-            # расход (плашка в стиле статусов)
-            consumed_parts = []
-            if prev:
-                for key, label, unit in MEASURED_PARAMS:
-                    v = latest.get(key)
-                    pv = prev.get(key)
-                    if v is not None and pv is not None:
-                        diff = pv - v
-                        if diff > 0.01:
-                            consumed_parts.append(f"{label} -{diff:g}{unit}")
-            if consumed_parts:
-                cons_frame = tk.Frame(right_col, bg="#1c1f2e", padx=6, pady=3)
-                cons_frame.pack(fill="x", pady=(4, 0))
-                tk.Label(cons_frame, text="Расход", font=(FF, 8),
-                         bg="#1c1f2e", fg=COLOR_TEXT_MUTED).pack(anchor="w")
-                tk.Label(cons_frame, text=", ".join(consumed_parts), font=(FF, 9),
-                         bg="#1c1f2e", fg="#e88a8a").pack(anchor="w")
-
             # последняя дозировка (плашка в стиле статусов)
             dosing_rows = get_dosing(self.conn, aq_id)
             if dosing_rows:
