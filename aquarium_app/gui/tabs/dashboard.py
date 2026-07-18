@@ -82,7 +82,7 @@ class DashboardTab:
         # микро — зеленовато-коричневый
         for key in ("f_fe", "f_mn", "f_b", "f_zn", "f_cu", "f_mo", "f_co"):
             if dosing_row.get(key):
-                return "#7d9a5e"
+                return "#8B7D5E"
         return COLOR_ACCENT
 
     @staticmethod
@@ -186,7 +186,7 @@ class DashboardTab:
                             trend_clr = "#6bcb77"  # добавлено — зелёный
                         else:
                             trend_txt = f" {diff:g}"
-                            trend_clr = "#e88a8a"  # израсходовано — красный
+                            trend_clr = "#e64980"  # израсходовано — красный
                         tk.Label(row, text=trend_txt, font=(FF, 9),
                                  bg=COLOR_CARD, fg=trend_clr).pack(side="left", padx=(4, 0))
 
