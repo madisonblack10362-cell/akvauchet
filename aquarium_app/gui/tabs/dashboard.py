@@ -190,12 +190,8 @@ class DashboardTab:
                 date_s = from_iso(last_dose_date)
                 dose_frame = tk.Frame(right_col, bg="#1c1f2e", padx=6, pady=3)
                 dose_frame.pack(fill="x")
-                header_row = tk.Frame(dose_frame, bg="#1c1f2e")
-                header_row.pack(fill="x")
-                tk.Label(header_row, text="Дозировка", font=(FF, 8),
-                         bg="#1c1f2e", fg=COLOR_TEXT_MUTED).pack(side="left")
-                tk.Label(header_row, text=date_s,
-                         font=(FF, 8), bg="#1c1f2e", fg=COLOR_TEXT_MUTED).pack(side="right")
+                tk.Label(dose_frame, text=f"Дозировка — {date_s}", font=(FF, 8),
+                         bg="#1c1f2e", fg=COLOR_TEXT_MUTED).pack(anchor="w")
                 for d in last_doses:
                     fert_name = d["fert_name"] or "Удобрение"
                     dose_val = d["dose"]
