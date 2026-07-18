@@ -39,21 +39,21 @@ def _element_color(formula):
     return COLOR_ACCENT
 
 
-def fmt_axis(val):
+def fmt_axis(val, key=None):
     """Форматирует значение для подписи оси графика с адаптивной точностью.
 
-    Микроэлементы (Fe, Mn и т.п.) обычно вносятся в дозах 0.01-0.05 мг/л —
-    при фиксированном форматировании "{val:.1f}" такие значения всегда
-    округляются до "0.0", из-за чего шкала графика выглядит нерабочей
-    (сверху и снизу одна и та же подпись "0.0", хотя столбик на графике
-    явно виден). Даём больше знаков после запятой для маленьких величин.
+    Макроэлементы (NO3, PO4, K) всегда округляются до 1 знака.
+    Микроэлементы сохраняют точность для маленьких величин.
     """
+    macro = {"no3", "po4", "k"}
+    if key in macro:
+        return f"{val:.1f}"
     if val == 0:
         return "0"
     av = abs(val)
     if av < 0.01:
         return f"{val:.3f}"
-    elif av < 0.1:
+    elif av < 1:
         return f"{val:.2f}"
     return f"{val:.1f}"
 
@@ -266,7 +266,7 @@ def draw_param_trend_chart(
         for frac, val in [(0.0, local_max), (1.0, local_min)]:
             y = strip_top + strip_h * frac
             canvas.create_line(pad_l, y, pad_l + plot_w, y, fill="#2c2f3a", width=1)
-            canvas.create_text(pad_l - 4, y, anchor="e", text=fmt_axis(val),
+            canvas.create_text(pad_l - 4, y, anchor="e", text=fmt_axis(val, key=key),
                                fill=COLOR_TEXT_MUTED, font=(font_family, 7))
 
         points = []
@@ -532,7 +532,7 @@ def draw_daily_bars_chart(
     for key, color, label, hist in elem_data:
         vals = [v for _, v in hist if isinstance(v, (int, float))]
         total = sum(vals)
-        txt = f"{label}  {fmt_axis(total)}"
+        txt = f"{label}  {fmt_axis(total, key=key)}"
         canvas.create_rectangle(lx, legend_y - 4, lx + 10, legend_y + 4,
                                 fill=color, outline="")
         canvas.create_text(lx + 14, legend_y, anchor="w",
@@ -602,7 +602,7 @@ def _on_bars_hover(canvas, event):
         canvas.create_oval(tx + 10, py + 2, tx + 18, py + 10,
                             fill=color, outline="", tags="hover")
         canvas.create_text(tx + 22, py + 6, anchor="w",
-                            text=f"{label}:  {fmt_axis(val)} мг/л",
+                            text=f"{label}:  {fmt_axis(val, key=key)} мг/л",
                             fill=color, font=(ff, 9, "bold"), tags="hover")
 
 
@@ -677,17 +677,17 @@ def on_chart_hover(canvas, event):
             if p.get("_no_data"):
                 tip_lines.append(("val", f"{label}: —", COLOR_TEXT_MUTED))
             else:
-                tip_lines.append(("val", f'{label}: {fmt_axis(p["value"])}', color))
+                tip_lines.append(("val", f'{label}: {fmt_axis(p["value"], key=p.get("_key"))}', color))
         else:
             left_points = [p for p in points if p["label"] == label and p["x"] <= x]
             if left_points:
                 closest = max(left_points, key=lambda p: p["x"])
-                tip_lines.append(("val", f'{label}: {fmt_axis(closest["value"])}', color))
+                tip_lines.append(("val", f'{label}: {fmt_axis(closest["value"], key=closest.get("_key"))}', color))
             else:
                 right_points = [p for p in points if p["label"] == label and p["x"] > x]
                 if right_points:
                     closest = min(right_points, key=lambda p: p["x"])
-                    tip_lines.append(("val", f'{label}: {fmt_axis(closest["value"])}', color))
+                    tip_lines.append(("val", f'{label}: {fmt_axis(closest["value"], key=closest.get("_key"))}', color))
                 else:
                     tip_lines.append(("val", f"{label}: 0", color))
 

@@ -826,6 +826,14 @@ class DosingTab:
             ("no3", ELEMENT_COLORS["no3"], "NO3"),
             ("k", ELEMENT_COLORS["k"], "K"),
             ("fe", ELEMENT_COLORS["fe"], "Fe"),
+            ("mg", ELEMENT_COLORS["mg"], "Mg"),
+            ("ca", ELEMENT_COLORS["ca"], "Ca"),
+            ("mn", ELEMENT_COLORS["mn"], "Mn"),
+            ("b", ELEMENT_COLORS["b"], "B"),
+            ("zn", ELEMENT_COLORS["zn"], "Zn"),
+            ("cu", ELEMENT_COLORS["cu"], "Cu"),
+            ("mo", ELEMENT_COLORS["mo"], "Mo"),
+            ("co", ELEMENT_COLORS["co"], "Co"),
         ]
 
         days = None
