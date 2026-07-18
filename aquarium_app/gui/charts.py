@@ -687,7 +687,7 @@ def on_chart_hover(canvas, event):
             else:
                 _v = fmt_axis(p["value"], key=p.get("_key"))
                 if is_dosing:
-                    tip_lines.append(("val", f"{label}: +{_v}", "#6bcb77"))
+                    tip_lines.append(("dval", label, color, f"+{_v}"))
                 else:
                     tip_lines.append(("val", f'{label}: {_v}', color))
         else:
@@ -696,7 +696,7 @@ def on_chart_hover(canvas, event):
                 closest = max(left_points, key=lambda p: p["x"])
                 _v = fmt_axis(closest["value"], key=closest.get("_key"))
                 if is_dosing:
-                    tip_lines.append(("val", f"{label}: +{_v}", "#6bcb77"))
+                    tip_lines.append(("dval", label, color, f"+{_v}"))
                 else:
                     tip_lines.append(("val", f'{label}: {_v}', color))
             else:
@@ -705,7 +705,7 @@ def on_chart_hover(canvas, event):
                     closest = min(right_points, key=lambda p: p["x"])
                     _v = fmt_axis(closest["value"], key=closest.get("_key"))
                     if is_dosing:
-                        tip_lines.append(("val", f"{label}: +{_v}", "#6bcb77"))
+                        tip_lines.append(("dval", label, color, f"+{_v}"))
                     else:
                         tip_lines.append(("val", f'{label}: {_v}', color))
                 else:
@@ -795,6 +795,16 @@ def on_chart_hover(canvas, event):
             sep_f = tk.Frame(pad_frame, bg="#05060a", height=4)
             sep_f.pack(fill="x")
             tk.Frame(sep_f, bg=COLOR_BORDER, height=1).pack(fill="x", pady=(1, 0))
+            continue
+        if item[0] == "dval":
+            # дозирование: название элемента своим цветом, значение зелёным
+            _label, elem_color, val_text = item[1], item[2], item[3]
+            row_f = tk.Frame(pad_frame, bg="#05060a")
+            row_f.pack(fill="x")
+            tk.Label(row_f, text=f"{_label}: ", bg="#05060a", fg=elem_color,
+                     font=(ff, 8), anchor="w", pady=0).pack(side="left")
+            tk.Label(row_f, text=val_text, bg="#05060a", fg="#6bcb77",
+                     font=(ff, 8), anchor="w", pady=0).pack(side="left")
             continue
         if item[0] == "cons_split":
             # элемент своим цветом, значение нейтральным
