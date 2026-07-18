@@ -175,7 +175,10 @@ class DashboardTab:
         ratio_vals = {}
         if readings:
             latest = readings[0]
-            for key, _, _ in MEASURED_PARAMS:
+            # MEASURED_PARAMS: po4, no3, ph — добавляем fe/mn для Fe:Mn
+            ratio_keys = {k for k, _, _ in MEASURED_PARAMS}
+            ratio_keys.update(["fe", "mn"])
+            for key in ratio_keys:
                 v = latest.get(key)
                 if v is not None and v > 0:
                     ratio_vals[key] = v
@@ -204,15 +207,6 @@ class DashboardTab:
 
         # --- индикатор подмены воды (за неделю) ---
         wc_stats = get_water_change_stats(self.conn, aq_id, days=7)
-        aq = get_aquarium(self.conn, aq_id)
-        vol = aq["volume_l"] if aq else 0
-
-        # пересчитываем проценты если их нет в базе (старые записи)
-        if vol and wc_stats["count"] > 0:
-            if wc_stats["last_pct"] is None and wc_stats["last_l"] is not None:
-                wc_stats["last_pct"] = round(wc_stats["last_l"] / vol * 100, 1)
-            if wc_stats["total_pct"] == 0 and wc_stats["total_l"] > 0:
-                wc_stats["total_pct"] = round(wc_stats["total_l"] / vol * 100, 1)
 
         wc_frame = tk.Frame(card, bg=COLOR_ACCENT_SOFT, highlightbackground=COLOR_ACCENT,
                             highlightthickness=1)

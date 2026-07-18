@@ -40,47 +40,12 @@ def sum_last_n_days(conn, aq_id, n=7):
     return totals
 
 
-def sum_current_calendar_week(conn, aq_id):
-    """Сумма прироста каждого элемента (мг/л) с начала ТЕКУЩЕЙ календарной недели
-    (с понедельника) по сегодняшний день включительно.
-
-    В отличие от sum_last_n_days (скользящее окно 7 дней), здесь период "привязан"
-    к календарной неделе: в понедельник счётчик естественным образом начинает
-    считать заново (обнуляется), т.к. датой начала периода всегда становится
-    понедельник ТЕКУЩЕЙ недели. Отдельного "обнуления" в БД не требуется —
-    это просто способ выбрать данные за нужный период (данные за прошлые недели
-    никуда не удаляются, они просто не попадают в эту выборку).
-
-    Возвращает (totals, week_start, week_end):
-      totals     — словарь {элемент: суммарный прирост, мг/л}
-      week_start — дата понедельника текущей недели (datetime.date)
-      week_end   — сегодняшняя дата (datetime.date)
-    """
-    aq = get_aquarium(conn, aq_id)
-    volume = aq["volume_l"]
-    today = dt.date.today()
-    week_start = today - dt.timedelta(days=today.weekday())  # понедельник (weekday()==0)
-    since = week_start.isoformat()
-    rows = conn.execute("""
-        SELECT d.dose, f.no3,f.po4,f.k,f.fe,f.mg,f.ca,f.mn,f.b,f.zn,f.cu,f.mo,f.co
-        FROM dosing d JOIN fertilizers f ON d.fert_id=f.id
-        WHERE d.aquarium_id=? AND d.date>=?
-    """, (aq_id, since)).fetchall()
-    totals = {k: 0.0 for k in ELEMENT_KEYS}
-    for r in rows:
-        for k in ELEMENT_KEYS:
-            totals[k] += (r[k] or 0.0) * r["dose"] / volume if volume else 0.0
-    return totals, week_start, today
-
-
 def sum_range_totals(conn, aq_id, date_from=None, date_to=None):
     """Сумма прироста каждого элемента (мг/л) за произвольный диапазон дат
     (ISO, включительно с обеих сторон). date_from/date_to можно не указывать —
     отсутствующая граница просто не применяется (оба None = вся история).
 
-    В отличие от sum_period_totals (только "последние N дней ДО сегодня"),
-    здесь можно задать любой промежуток в прошлом, включая уже завершённый —
-    используется для сводки "Итого за период" на вкладке «Дозирование».
+    Используется для сводки "Итого за период" на вкладке «Дозирование».
     """
     aq = get_aquarium(conn, aq_id)
     volume = aq["volume_l"]
@@ -97,37 +62,6 @@ def sum_range_totals(conn, aq_id, date_from=None, date_to=None):
         SELECT d.dose, f.no3,f.po4,f.k,f.fe,f.mg,f.ca,f.mn,f.b,f.zn,f.cu,f.mo,f.co
         FROM dosing d JOIN fertilizers f ON d.fert_id=f.id
         WHERE d.aquarium_id=?{where_sql}
-    """, params).fetchall()
-    totals = {k: 0.0 for k in ELEMENT_KEYS}
-    for r in rows:
-        for k in ELEMENT_KEYS:
-            totals[k] += (r[k] or 0.0) * r["dose"] / volume if volume else 0.0
-    return totals
-
-
-def sum_period_totals(conn, aq_id, days=None, since_iso=None):
-    """Сумма прироста каждого элемента (мг/л), внесённого со всеми удобрениями
-    за указанный период (см. get_parameter_history — days/since_iso работают
-    так же). Если оба параметра None — считается вся история аквариума.
-
-    В отличие от sum_current_calendar_week (жёстко текущая неделя), период
-    здесь произвольный — используется для графика трендов внесения удобрений.
-    """
-    aq = get_aquarium(conn, aq_id)
-    volume = aq["volume_l"]
-    params = [aq_id]
-    where_date = ""
-    if since_iso:
-        where_date = " AND d.date>=?"
-        params.append(since_iso)
-    elif days is not None:
-        since = (dt.date.today() - dt.timedelta(days=days)).isoformat()
-        where_date = " AND d.date>=?"
-        params.append(since)
-    rows = conn.execute(f"""
-        SELECT d.dose, f.no3,f.po4,f.k,f.fe,f.mg,f.ca,f.mn,f.b,f.zn,f.cu,f.mo,f.co
-        FROM dosing d JOIN fertilizers f ON d.fert_id=f.id
-        WHERE d.aquarium_id=?{where_date}
     """, params).fetchall()
     totals = {k: 0.0 for k in ELEMENT_KEYS}
     for r in rows:

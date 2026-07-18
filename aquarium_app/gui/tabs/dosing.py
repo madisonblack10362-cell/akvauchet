@@ -256,7 +256,7 @@ class DosingTab:
         # получаем объём аквариума
         aq_id = getattr(self, "_dosing_aq_id", None)
         aq = get_aquarium(self.conn, aq_id) if aq_id else None
-        volume = aq["volume_l"] if aq and aq["volume_l"] else 1.0
+        volume = aq["volume_l"] if aq and aq["volume_l"] else 0
 
         deltas = compute_deltas(fert, dose, volume)
         active = [(ek, deltas[ek]) for ek in ELEMENT_KEYS if deltas[ek] > 0]
@@ -395,7 +395,7 @@ class DosingTab:
             return
         tree.delete(*tree.get_children())
 
-        volume = aq["volume_l"] or 1.0
+        volume = aq["volume_l"] or 0
 
         for r in rows:
             delta = compute_deltas(r, r["dose"], volume)
@@ -755,6 +755,12 @@ class DosingTab:
     def _get_dose_filter_range(self):
         today = dt.date.today()
         key = getattr(self, "_dose_filter", "30d")
+        if key == "all":
+            return None, None
+        n = {"7d": 7, "30d": 30, "90d": 90}.get(key)
+        if n is not None:
+            since = (today - dt.timedelta(days=n)).isoformat()
+            return since, today.isoformat()
         if key == "today":
             return today.isoformat(), today.isoformat()
         if key == "latest":
@@ -765,13 +771,7 @@ class DosingTab:
                 if latest:
                     return latest, latest
             return today.isoformat(), today.isoformat()
-        if key == "7d":
-            since = (today - dt.timedelta(days=7)).isoformat()
-            return since, today.isoformat()
-        if key == "30d":
-            since = (today - dt.timedelta(days=30)).isoformat()
-            return since, today.isoformat()
-        return None, today.isoformat()
+        return None, None
 
     # ------------------------------------------------------------------
     # Фильтры тренда

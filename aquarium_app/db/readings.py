@@ -99,7 +99,10 @@ def update_reading(conn: sqlite3.Connection, reading_id: int, date: str,
 
 
 def get_water_change_stats(conn: sqlite3.Connection, aq_id: int, days: int = 30):
-    """Возвращает статистику подмен воды: total_pct, total_l, count, last_date, last_pct, last_l."""
+    """Возвращает статистику подмен воды: total_pct, total_l, count, last_date, last_pct, last_l.
+
+    total_pct всегда включает пересчёт литров в проценты (если известен объём
+    аквариума — передаётся через volume_l)."""
     since = (dt.date.today() - dt.timedelta(days=days)).isoformat()
     rows = conn.execute("""
         SELECT water_change_pct, water_change_l, date
@@ -107,6 +110,10 @@ def get_water_change_stats(conn: sqlite3.Connection, aq_id: int, days: int = 30)
         WHERE aquarium_id=? AND date>=? AND (water_change_pct IS NOT NULL OR water_change_l IS NOT NULL)
         ORDER BY date DESC
     """, (aq_id, since)).fetchall()
+
+    # получаем объём для пересчёта литров → %
+    aq = conn.execute("SELECT volume_l FROM aquariums WHERE id=?", (aq_id,)).fetchone()
+    vol = aq["volume_l"] if aq and aq["volume_l"] else 0
 
     total_pct = 0.0
     total_l = 0.0
@@ -118,6 +125,9 @@ def get_water_change_stats(conn: sqlite3.Connection, aq_id: int, days: int = 30)
     for r in rows:
         pct = r["water_change_pct"]
         lit = r["water_change_l"]
+        # пересчитываем литры в % если pct не указан
+        if pct is None and lit is not None and vol > 0:
+            pct = round(lit / vol * 100, 1)
         if pct is not None:
             total_pct += pct
         if lit is not None:
