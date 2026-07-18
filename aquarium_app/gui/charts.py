@@ -291,6 +291,27 @@ def draw_param_trend_chart(
         canvas.create_text(label_x, last_y, anchor="w", text=label,
                            fill=color, font=(font_family, 8, "bold"))
 
+        # --- пунктирное продолжение до «сегодня», если нет замера ---
+        try:
+            last_d = dt.date.fromisoformat(hist[-1][0])
+        except Exception:
+            last_d = None
+        if last_d and last_d < today:
+            tx = x_for_date(today.isoformat())
+            canvas.create_line(last_x, last_y, tx, last_y,
+                               fill=color, width=1, dash=(4, 4))
+            r = 3
+            canvas.create_oval(tx - r, last_y - r, tx + r, last_y + r,
+                               outline=color, width=1.5, dash=(2, 2))
+            canvas.create_text(tx, last_y - 9, text="—",
+                               fill=COLOR_TEXT_MUTED, font=(font_family, 7))
+            hover_points.append({
+                "x": tx, "y": last_y,
+                "date": today.isoformat(), "value": None,
+                "label": label, "color": color,
+                "_key": key, "_is_wc": False, "_no_data": True,
+            })
+
     # ---- подписи оси X (даты начала и конца периода) ----
     axis_y = h - 2
     canvas.create_text(pad_l, axis_y, anchor="sw", text=period_start.strftime("%d.%m"),
@@ -653,7 +674,10 @@ def on_chart_hover(canvas, event):
         matched = [p for p in same_x if p["label"] == label]
         if matched:
             p = matched[0]
-            tip_lines.append(("val", f'{label}: {fmt_axis(p["value"])}', color))
+            if p.get("_no_data"):
+                tip_lines.append(("val", f"{label}: —", COLOR_TEXT_MUTED))
+            else:
+                tip_lines.append(("val", f'{label}: {fmt_axis(p["value"])}', color))
         else:
             left_points = [p for p in points if p["label"] == label and p["x"] <= x]
             if left_points:
@@ -680,6 +704,8 @@ def on_chart_hover(canvas, event):
         if not real_matched:
             continue
         p = real_matched[0]
+        if p.get("_no_data"):
+            continue
         val = p["value"]
         pkey = p.get("_key", "")
         if not pkey or pkey not in param_hist:
