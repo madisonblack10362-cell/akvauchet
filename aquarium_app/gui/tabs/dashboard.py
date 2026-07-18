@@ -25,9 +25,9 @@ from aquarium_app.config import (
     MEASURED_PARAMS,
 )
 from aquarium_app.db import get_aquariums, get_aquarium, get_readings, get_dosing
-from aquarium_app.logic.calculations import out_of_range_flags, sum_last_n_days
+from aquarium_app.logic.calculations import sum_last_n_days
 from aquarium_app.logic.formatters import from_iso
-from aquarium_app.gui.charts import draw_element_bars, schedule_chart_draw
+from aquarium_app.gui.charts import draw_element_bars, schedule_chart_draw, _element_color
 
 
 class DashboardTab:
@@ -72,6 +72,18 @@ class DashboardTab:
 
     def _dash_wheel(self, event):
         self.dash_canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+
+    @staticmethod
+    def _fert_color(dosing_row):
+        """Цвет удобрения по его основному элементу."""
+        # приоритет: макро > железо > микро > дефолт
+        for key in ("f_no3", "f_po4", "f_k", "f_mg", "f_ca"):
+            if dosing_row.get(key):
+                return _element_color(key[2:].upper())
+        for key in ("f_fe", "f_mn", "f_b", "f_zn", "f_cu", "f_mo", "f_co"):
+            if dosing_row.get(key):
+                return _element_color(key[2:].upper())
+        return COLOR_ACCENT
 
     def refresh_dashboard(self):
         container = self.dash_inner
@@ -169,19 +181,7 @@ class DashboardTab:
                         tk.Label(row, text=trend_txt, font=(FF, 9),
                                  bg=COLOR_CARD, fg=trend_clr).pack(side="left", padx=(4, 0))
 
-            # --- правая колонка: статусы + расход + дозировка ---
-            values = {key: latest.get(key) for key, _, _ in MEASURED_PARAMS}
-            flags = out_of_range_flags(self.conn, aq_id, values)
-            if flags:
-                for flag in flags:
-                    tk.Label(right_col, text=f"  {flag}", font=(FF, 9),
-                             bg=COLOR_WARN, fg=COLOR_WARN_TEXT, anchor="w",
-                             padx=6, pady=3).pack(fill="x", pady=1)
-            else:
-                tk.Label(right_col, text="  Все параметры в норме", font=(FF, 9),
-                         bg=COLOR_OK_BG, fg=COLOR_OK_TEXT, padx=6, pady=3).pack(fill="x")
-
-            # последняя дозировка (плашка в стиле статусов)
+            # --- правая колонка: дозировка с цветами по элементам ---
             dosing_rows = get_dosing(self.conn, aq_id)
             if dosing_rows:
                 # берём все записи за последнюю дату дозирования
@@ -189,7 +189,7 @@ class DashboardTab:
                 last_doses = [d for d in dosing_rows if d["date"] == last_dose_date]
                 date_s = from_iso(last_dose_date)
                 dose_frame = tk.Frame(right_col, bg="#1c1f2e", padx=6, pady=3)
-                dose_frame.pack(fill="x", pady=(4, 0))
+                dose_frame.pack(fill="x")
                 tk.Label(dose_frame, text="Дозировка", font=(FF, 8),
                          bg="#1c1f2e", fg=COLOR_TEXT_MUTED).pack(anchor="w")
                 for d in last_doses:
@@ -197,8 +197,10 @@ class DashboardTab:
                     dose_val = d["dose"]
                     row = tk.Frame(dose_frame, bg="#1c1f2e")
                     row.pack(fill="x")
+                    # цвет по основному элементу удобрения
+                    elem_clr = self._fert_color(d)
                     tk.Label(row, text=f"{fert_name} {dose_val:g} мл",
-                             font=(FF, 9, "bold"), bg="#1c1f2e", fg=COLOR_ACCENT).pack(side="left")
+                             font=(FF, 9, "bold"), bg="#1c1f2e", fg=elem_clr).pack(side="left")
                 tk.Label(dose_frame, text=f"— {date_s}",
                          font=(FF, 8), bg="#1c1f2e", fg=COLOR_TEXT_MUTED).pack(anchor="w")
         else:
