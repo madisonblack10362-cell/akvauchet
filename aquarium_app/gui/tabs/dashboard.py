@@ -190,8 +190,12 @@ class DashboardTab:
                 date_s = from_iso(last_dose_date)
                 dose_frame = tk.Frame(right_col, bg="#1c1f2e", padx=6, pady=3)
                 dose_frame.pack(fill="x")
-                tk.Label(dose_frame, text="Дозировка", font=(FF, 8),
-                         bg="#1c1f2e", fg=COLOR_TEXT_MUTED).pack(anchor="w")
+                header_row = tk.Frame(dose_frame, bg="#1c1f2e")
+                header_row.pack(fill="x")
+                tk.Label(header_row, text="Дозировка", font=(FF, 8),
+                         bg="#1c1f2e", fg=COLOR_TEXT_MUTED).pack(side="left")
+                tk.Label(header_row, text=date_s,
+                         font=(FF, 8), bg="#1c1f2e", fg=COLOR_TEXT_MUTED).pack(side="right")
                 for d in last_doses:
                     fert_name = d["fert_name"] or "Удобрение"
                     dose_val = d["dose"]
@@ -201,8 +205,6 @@ class DashboardTab:
                     elem_clr = self._fert_color(d)
                     tk.Label(row, text=f"{fert_name} {dose_val:g} мл",
                              font=(FF, 9, "bold"), bg="#1c1f2e", fg=elem_clr).pack(side="left")
-                tk.Label(dose_frame, text=f"— {date_s}",
-                         font=(FF, 8), bg="#1c1f2e", fg=COLOR_TEXT_MUTED).pack(anchor="w")
         else:
             tk.Label(left_col, text="Замеров пока нет", font=(FF, 9),
                      bg=COLOR_CARD, fg=COLOR_TEXT_MUTED).pack(anchor="w")
