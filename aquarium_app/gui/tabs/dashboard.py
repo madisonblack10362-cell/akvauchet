@@ -190,8 +190,8 @@ class DashboardTab:
         # --- внесено за неделю ---
         self._build_weekly_dose_bars(card, aq_id)
 
-        # --- последняя активность ---
-        self._build_activity_line(card, aq_id, readings)
+        # --- последняя дозировка + расход ---
+        self._build_dose_consumed_line(card, aq_id, readings)
 
     # ------------------------------------------------------------------
     # Блок подмены воды (прогресс-бар с заливкой по %)
@@ -314,54 +314,44 @@ class DashboardTab:
             schedule_chart_draw(bar_canvas, draw_element_bars, items, font_family=self.FF)
 
     # ------------------------------------------------------------------
-    # Последняя активность — хронология из 3 событий
+    # Последняя дозировка + израсходовано
     # ------------------------------------------------------------------
 
-    def _build_activity_line(self, card, aq_id, readings):
+    def _build_dose_consumed_line(self, card, aq_id, readings):
         FF = self.FF
 
-        act_frame = tk.Frame(card, bg=COLOR_CARD)
-        act_frame.pack(fill="x", pady=(8, 0))
+        info_frame = tk.Frame(card, bg=COLOR_CARD)
+        info_frame.pack(fill="x", pady=(6, 0))
 
-        tk.Label(act_frame, text="Последняя активность", font=(FF, 9, "bold"),
-                 bg=COLOR_CARD, fg=COLOR_TEXT_MUTED).pack(anchor="w", pady=(0, 3))
+        # --- израсходовано: для параметров что упали ---
+        consumed_parts = []
+        if readings and len(readings) > 1:
+            latest = readings[0]
+            prev = readings[1]
+            for key, label, unit in MEASURED_PARAMS:
+                v = latest.get(key)
+                pv = prev.get(key)
+                if v is not None and pv is not None:
+                    diff = pv - v  # положительное = расход
+                    if diff > 0.01:
+                        consumed_parts.append(f"{label} -{diff:g}{unit}")
 
-        events = []
+        if consumed_parts:
+            row = tk.Frame(info_frame, bg=COLOR_CARD)
+            row.pack(fill="x")
+            tk.Label(row, text="Расход: ", font=(FF, 9),
+                     bg=COLOR_CARD, fg=COLOR_TEXT_MUTED).pack(side="left")
+            tk.Label(row, text=", ".join(consumed_parts), font=(FF, 9),
+                     bg=COLOR_CARD, fg="#e88a8a").pack(side="left")
 
-        # последний замер
-        if readings:
-            events.append((readings[0]["date"], "Замер", COLOR_TEXT))
-
-        # последняя дозировка
+        # --- последняя дозировка ---
         dosing_rows = get_dosing(self.conn, aq_id)
         if dosing_rows:
             d = dosing_rows[0]
             fert_name = d["fert_name"] or "Удобрение"
-            events.append((d["date"], f"Дозировка: {fert_name}", COLOR_ACCENT))
-
-        # последняя подмена (из readings)
-        for r in (readings or []):
-            if r.get("water_change_pct") is not None or r.get("water_change_l") is not None:
-                events.append((r["date"], "Подмена воды", COLOR_OK_TEXT))
-                break
-
-        # сортируем по дате (убывание) и берём 3 свежих
-        events.sort(key=lambda e: e[0], reverse=True)
-        events = events[:3]
-
-        if not events:
-            tk.Label(act_frame, text="  Нет записей", font=(FF, 9),
-                     bg=COLOR_CARD, fg=COLOR_TEXT_MUTED).pack(anchor="w")
-            return
-
-        row = tk.Frame(act_frame, bg=COLOR_CARD)
-        row.pack(fill="x")
-
-        for i, (date_iso, text, clr) in enumerate(events):
-            if i > 0:
-                tk.Label(row, text="  >  ", font=(FF, 9),
-                         bg=COLOR_CARD, fg=COLOR_BORDER).pack(side="left")
-            date_s = from_iso(date_iso)
-            lbl_text = f"{date_s}  {text}"
-            tk.Label(row, text=lbl_text, font=(FF, 9),
-                     bg=COLOR_CARD, fg=clr).pack(side="left")
+            dose_val = d["dose"]
+            date_s = from_iso(d["date"])
+            row = tk.Frame(info_frame, bg=COLOR_CARD)
+            row.pack(fill="x", pady=(2, 0))
+            tk.Label(row, text=f"Дозировка: {fert_name} {dose_val:g} мл — {date_s}",
+                     font=(FF, 9), bg=COLOR_CARD, fg=COLOR_ACCENT).pack(side="left")
