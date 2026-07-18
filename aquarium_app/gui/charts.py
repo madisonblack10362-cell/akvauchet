@@ -715,8 +715,8 @@ def on_chart_hover(canvas, event):
         for fert_name, dose_val in dose_list:
             tip_lines.append(("dose_split", fert_name, dose_val))
 
-    # ===== БЛОК 4: Последняя подмена (только если было ДО этой даты) =====
-    if hover_date:
+    # ===== БЛОК 4: Последняя подмена (только если в ЭТОТ день не было подмены) =====
+    if hover_date and hover_iso not in wc_dates_set:
         prev_wc = [d for d in wc_dates_set if d < hover_iso]
         if prev_wc:
             try:
