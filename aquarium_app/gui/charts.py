@@ -704,36 +704,37 @@ def on_chart_hover(canvas, event):
     if wc_pct is not None:
         tip_lines.append(("wc", f'Подмена: {wc_pct:.1f}%', "#20c997"))
 
-    # ===== БЛОК 2: Израсходовано (отдельный блок) =====
-    consumed_lines = []  # [(label, elem_color, consumed_text, val_color), ...]
-    for color, label in all_labels:
-        real_matched = [p for p in same_x if p["label"] == label]
-        if not real_matched:
-            continue
-        p = real_matched[0]
-        if p.get("_no_data"):
-            continue
-        val = p["value"]
-        pkey = p.get("_key", "")
-        if not pkey or pkey not in param_hist:
-            continue
-        hist = param_hist[pkey]
-        cur_idx = None
-        for i, (d, v) in enumerate(hist):
-            if d == hover_iso and v == val:
-                cur_idx = i
-                break
-        if cur_idx is not None and cur_idx > 0:
-            prev_d, prev_v = hist[cur_idx - 1]
-            delta = val - prev_v
-            consumed = -delta
-            if consumed > 0:
-                val_color = "#e88a8a"
-                consumed_text = f"-{fmt_axis(consumed)}"
-            else:
-                val_color = "#6bcb77"
-                consumed_text = f"+{fmt_axis(-consumed)}"
-            consumed_lines.append((label, color, consumed_text, val_color))
+    # ===== БЛОК 2: Израсходовано (только для графика показаний, не дозирования) =====
+    consumed_lines = []
+    if not getattr(canvas, "_is_dosing_chart", False):
+        for color, label in all_labels:
+            real_matched = [p for p in same_x if p["label"] == label]
+            if not real_matched:
+                continue
+            p = real_matched[0]
+            if p.get("_no_data"):
+                continue
+            val = p["value"]
+            pkey = p.get("_key", "")
+            if not pkey or pkey not in param_hist:
+                continue
+            hist = param_hist[pkey]
+            cur_idx = None
+            for i, (d, v) in enumerate(hist):
+                if d == hover_iso and v == val:
+                    cur_idx = i
+                    break
+            if cur_idx is not None and cur_idx > 0:
+                prev_d, prev_v = hist[cur_idx - 1]
+                delta = val - prev_v
+                consumed = -delta
+                if consumed > 0:
+                    val_color = "#e88a8a"
+                    consumed_text = f"-{fmt_axis(consumed)}"
+                else:
+                    val_color = "#6bcb77"
+                    consumed_text = f"+{fmt_axis(-consumed)}"
+                consumed_lines.append((label, color, consumed_text, val_color))
 
     if consumed_lines:
         tip_lines.append(("sep", "", ""))

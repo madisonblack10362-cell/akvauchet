@@ -854,6 +854,7 @@ class DosingTab:
                 self.conn, aq_id, key, days=days, since_iso=since_iso)
             draw_fn = draw_daily_bars_chart
 
+        canvas._is_dosing_chart = True
         self._schedule_dosing_trend_chart_draw(
             canvas, draw_fn, self.conn, aq_id, param_defs,
             days=days, since_iso=since_iso, history_fn=history_fn,
