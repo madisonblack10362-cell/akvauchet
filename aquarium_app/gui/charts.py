@@ -676,6 +676,7 @@ def on_chart_hover(canvas, event):
     tip_lines = []
 
     # ===== БЛОК 1: Показания параметров (чистые значения) =====
+    is_dosing = getattr(canvas, "_is_dosing_chart", False)
     all_labels = getattr(canvas, "_hover_all_labels", [])
     for color, label in all_labels:
         matched = [p for p in same_x if p["label"] == label]
@@ -684,17 +685,29 @@ def on_chart_hover(canvas, event):
             if p.get("_no_data"):
                 tip_lines.append(("val", f"{label}: —", COLOR_TEXT_MUTED))
             else:
-                tip_lines.append(("val", f'{label}: {fmt_axis(p["value"], key=p.get("_key"))}', color))
+                _v = fmt_axis(p["value"], key=p.get("_key"))
+                if is_dosing:
+                    tip_lines.append(("val", f"{label}: +{_v}", "#6bcb77"))
+                else:
+                    tip_lines.append(("val", f'{label}: {_v}', color))
         else:
             left_points = [p for p in points if p["label"] == label and p["x"] <= x]
             if left_points:
                 closest = max(left_points, key=lambda p: p["x"])
-                tip_lines.append(("val", f'{label}: {fmt_axis(closest["value"], key=closest.get("_key"))}', color))
+                _v = fmt_axis(closest["value"], key=closest.get("_key"))
+                if is_dosing:
+                    tip_lines.append(("val", f"{label}: +{_v}", "#6bcb77"))
+                else:
+                    tip_lines.append(("val", f'{label}: {_v}', color))
             else:
                 right_points = [p for p in points if p["label"] == label and p["x"] > x]
                 if right_points:
                     closest = min(right_points, key=lambda p: p["x"])
-                    tip_lines.append(("val", f'{label}: {fmt_axis(closest["value"], key=closest.get("_key"))}', color))
+                    _v = fmt_axis(closest["value"], key=closest.get("_key"))
+                    if is_dosing:
+                        tip_lines.append(("val", f"{label}: +{_v}", "#6bcb77"))
+                    else:
+                        tip_lines.append(("val", f'{label}: {_v}', color))
                 else:
                     tip_lines.append(("val", f"{label}: 0", color))
 
