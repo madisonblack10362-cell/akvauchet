@@ -53,7 +53,7 @@ def fmt_axis(val):
     av = abs(val)
     if av < 0.01:
         return f"{val:.3f}"
-    elif av < 1:
+    elif av < 0.1:
         return f"{val:.2f}"
     return f"{val:.1f}"
 
