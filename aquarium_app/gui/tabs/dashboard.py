@@ -212,7 +212,7 @@ class DashboardTab:
                     row.pack(fill="x", anchor="w")
                     tk.Label(row, text=f"{fert_name} ", font=(FF, 9, "bold"),
                              bg=COLOR_CARD, fg=elem_clr).pack(side="left")
-                    tk.Label(row, text=f"{dose_val:g} мл", font=(FF, 9, "bold"),
+                    tk.Label(row, text=f"+{dose_val:g} мл", font=(FF, 9, "bold"),
                              bg=COLOR_CARD, fg="#6bcb77").pack(side="left")
         else:
             tk.Label(left_col, text="Замеров пока нет", font=(FF, 9),
