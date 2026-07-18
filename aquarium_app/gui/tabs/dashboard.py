@@ -79,10 +79,10 @@ class DashboardTab:
         for key in ("f_no3", "f_po4", "f_k", "f_mg", "f_ca"):
             if dosing_row.get(key):
                 return ELEMENT_COLORS.get(key[2:], COLOR_ACCENT)
-        # микро — отдельный бирюзовый цвет
+        # микро — зеленовато-коричневый
         for key in ("f_fe", "f_mn", "f_b", "f_zn", "f_cu", "f_mo", "f_co"):
             if dosing_row.get(key):
-                return "#20c997"
+                return "#7d9a5e"
         return COLOR_ACCENT
 
     @staticmethod
@@ -200,8 +200,10 @@ class DashboardTab:
                     key=self._fert_sort_key,
                 )
                 date_s = from_iso(last_dose_date)
-                tk.Label(right_col, text=f"Дозировка — {date_s}", font=(FF, 8),
-                         bg=COLOR_CARD, fg=COLOR_TEXT_MUTED).pack(anchor="w", pady=(2, 0))
+                tk.Label(right_col, text="Дозировка", font=(FF, 9, "bold"),
+                         bg=COLOR_CARD, fg=COLOR_TEXT).pack(anchor="w")
+                tk.Label(right_col, text=date_s, font=(FF, 9),
+                         bg=COLOR_CARD, fg=COLOR_TEXT_MUTED).pack(anchor="w", pady=(0, 2))
                 for d in last_doses:
                     fert_name = d["fert_name"] or "Удобрение"
                     dose_val = d["dose"]
