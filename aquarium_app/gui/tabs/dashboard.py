@@ -75,11 +75,13 @@ class DashboardTab:
 
     @staticmethod
     def _fert_color(dosing_row):
-        """Цвет удобрения по его основному элементу (из ELEMENT_COLORS)."""
+        """Цвет удобрения: микро-удобрения — зелёно-коричневый, макро — по элементу."""
+        name = (dosing_row.get("fert_name") or "").lower()
+        if "микро" in name or "micro" in name:
+            return "#8B7D5E"
         for key in ("f_no3", "f_po4", "f_k", "f_mg", "f_ca"):
             if dosing_row.get(key):
                 return ELEMENT_COLORS.get(key[2:], COLOR_ACCENT)
-        # микро — зеленовато-коричневый
         for key in ("f_fe", "f_mn", "f_b", "f_zn", "f_cu", "f_mo", "f_co"):
             if dosing_row.get(key):
                 return "#8B7D5E"
