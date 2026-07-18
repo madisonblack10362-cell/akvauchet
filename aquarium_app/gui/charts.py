@@ -601,14 +601,13 @@ def _on_bars_hover(canvas, event):
         py = ty + 6 + line_h * (i + 1)
         canvas.create_oval(tx + 10, py + 2, tx + 18, py + 10,
                             fill=color, outline="", tags="hover")
+        # уникальный тег для замера ширины этой строки
+        _mt = f"_mt{i}"
         canvas.create_text(tx + 22, py + 6, anchor="w",
                             text=f"{label}:  ", fill=color,
-                            font=(ff, 9, "bold"), tags="hover")
-        # замеряем ширину подписи чтобы поставить цифры зелёным рядом
-        bbox = canvas.bbox("hover")
-        if not bbox:
-            continue
-        val_x = bbox[2] + 1
+                            font=(ff, 9, "bold"), tags=("hover", _mt))
+        bbox = canvas.bbox(_mt)
+        val_x = (bbox[2] + 1) if bbox else (tx + 60)
         canvas.create_text(val_x, py + 6, anchor="w",
                             text=f"+{fmt_axis(val, key=key)} мг/л",
                             fill="#6bcb77", font=(ff, 9, "bold"), tags="hover")
