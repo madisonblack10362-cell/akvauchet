@@ -162,10 +162,10 @@ class DashboardTab:
                             trend_txt, trend_clr = " ->", COLOR_TEXT_MUTED
                         elif diff > 0:
                             trend_txt = f" +{diff:g}"
-                            trend_clr = COLOR_OK_TEXT if key == "no3" else COLOR_WARN_TEXT
+                            trend_clr = "#6bcb77"  # добавлено — зелёный
                         else:
                             trend_txt = f" {diff:g}"
-                            trend_clr = COLOR_OK_TEXT if key != "no3" else COLOR_WARN_TEXT
+                            trend_clr = "#e88a8a"  # израсходовано — красный
                         tk.Label(row, text=trend_txt, font=(FF, 9),
                                  bg=COLOR_CARD, fg=trend_clr).pack(side="left", padx=(4, 0))
 
