@@ -20,7 +20,7 @@ from tkinter import ttk
 from aquarium_app.config import (
     COLOR_BG, COLOR_CARD, COLOR_ACCENT, COLOR_ALT_ROW, COLOR_BORDER, COLOR_TEXT,
     COLOR_TEXT_MUTED, COLOR_TEXT_SOFT, COLOR_OK_TEXT, COLOR_OK_BG,
-    COLOR_ACCENT_SOFT, COLOR_WARN, COLOR_WARN_TEXT,
+    COLOR_WARN, COLOR_WARN_TEXT,
     COLOR_STATUS_WAITING, ELEMENTS,
     MEASURED_PARAMS,
 )
@@ -194,18 +194,14 @@ class DashboardTab:
         self._build_activity_line(card, aq_id, readings)
 
     # ------------------------------------------------------------------
-    # Блок подмены воды (компактный, с прогнозом)
+    # Блок подмены воды (прогресс-бар с заливкой по %)
     # ------------------------------------------------------------------
 
     def _build_water_change_block(self, card, aq_id, readings):
         FF = self.FF
 
-        wc_frame = tk.Frame(card, bg=COLOR_ACCENT_SOFT, highlightbackground=COLOR_ACCENT,
-                            highlightthickness=1)
+        wc_frame = tk.Frame(card, bg=COLOR_CARD)
         wc_frame.pack(fill="x", pady=(6, 0))
-
-        wc_row = tk.Frame(wc_frame, bg=COLOR_ACCENT_SOFT)
-        wc_row.pack(fill="x", padx=10, pady=8)
 
         # находим последнюю подмену из readings
         last_wc_date = None
@@ -228,9 +224,8 @@ class DashboardTab:
             try:
                 wc_d = dt.date.fromisoformat(last_wc_date)
                 days_since = (dt.date.today() - wc_d).days
-                # рекомендации: при 30% подмене — раз в 5-7 дней, при 50% — раз в 7-10
                 if last_wc_pct and last_wc_pct >= 30:
-                    interval = max(4, int(10 - last_wc_pct / 10))  # 30% -> 7 дн, 50% -> 5 дн
+                    interval = max(4, int(10 - last_wc_pct / 10))
                     days_until = max(0, interval - days_since)
                 else:
                     interval = 7
@@ -238,9 +233,9 @@ class DashboardTab:
             except (ValueError, TypeError):
                 pass
 
-        # левая часть: статус
-        left = tk.Frame(wc_row, bg=COLOR_ACCENT_SOFT)
-        left.pack(side="left", fill="both", expand=True)
+        # верхняя строка: текст + прогноз
+        top_row = tk.Frame(wc_frame, bg=COLOR_CARD)
+        top_row.pack(fill="x", padx=4, pady=(4, 2))
 
         if last_wc_date:
             pct_str = f" {last_wc_pct:.0f}%" if last_wc_pct else ""
@@ -252,30 +247,46 @@ class DashboardTab:
                     wc_main += " (вчера)"
                 else:
                     wc_main += f" ({days_since} дн. назад)"
-            tk.Label(left, text=wc_main, font=(FF, 9),
-                     bg=COLOR_ACCENT_SOFT, fg=COLOR_TEXT).pack(anchor="w")
+            tk.Label(top_row, text=wc_main, font=(FF, 9),
+                     bg=COLOR_CARD, fg=COLOR_TEXT).pack(side="left")
+
+            if days_until is not None:
+                if days_until <= 0:
+                    hint, hclr = "Пора!", COLOR_WARN_TEXT
+                elif days_until == 1:
+                    hint, hclr = "Завтра", COLOR_STATUS_WAITING
+                else:
+                    hint, hclr = f"Через {days_until} дн.", COLOR_TEXT_MUTED
+                tk.Label(top_row, text=hint, font=(FF, 10, "bold"),
+                         bg=COLOR_CARD, fg=hclr).pack(side="right")
         else:
-            tk.Label(left, text="Подмен ещё не было", font=(FF, 9),
-                     bg=COLOR_ACCENT_SOFT, fg=COLOR_TEXT_MUTED).pack(anchor="w")
+            tk.Label(top_row, text="Подмен ещё не было", font=(FF, 9),
+                     bg=COLOR_CARD, fg=COLOR_TEXT_MUTED).pack(side="left")
+            tk.Label(top_row, text="Пора!", font=(FF, 10, "bold"),
+                     bg=COLOR_CARD, fg=COLOR_WARN_TEXT).pack(side="right")
 
-        # правая часть: дней до следующей / предупреждение
-        right = tk.Frame(wc_row, bg=COLOR_ACCENT_SOFT)
-        right.pack(side="right")
+        # прогресс-бар: заливка по проценту подмены, цвет воды
+        bar_outer = tk.Canvas(wc_frame, bg=COLOR_BORDER, highlightthickness=0, height=8)
+        bar_outer.pack(fill="x", padx=4, pady=(2, 6))
+        bar_outer.update_idletasks()
 
-        if days_until is not None:
-            if days_until <= 0:
-                hint, hclr = "Пора подменять!", COLOR_WARN_TEXT
-            elif days_until == 1:
-                hint, hclr = "Завтра подмена", COLOR_STATUS_WAITING
-            elif days_until <= 3:
-                hint, hclr = f"Через {days_until} дн.", COLOR_TEXT_MUTED
-            else:
-                hint, hclr = f"Через {days_until} дн.", COLOR_TEXT_MUTED
-            tk.Label(right, text=hint, font=(FF, 10, "bold"),
-                     bg=COLOR_ACCENT_SOFT, fg=hclr).pack(anchor="e")
-        elif not last_wc_date:
-            tk.Label(right, text="Пора подменять!", font=(FF, 10, "bold"),
-                     bg=COLOR_ACCENT_SOFT, fg=COLOR_WARN_TEXT).pack(anchor="e")
+        # откладываем заливку чтобы canvas получил реальную ширину
+        pct_for_bar = min(last_wc_pct or 0, 100) / 100.0
+
+        def _draw_wc_bar():
+            if not bar_outer.winfo_exists():
+                return
+            w = bar_outer.winfo_width()
+            h = bar_outer.winfo_height()
+            bar_outer.delete("all")
+            if pct_for_bar > 0:
+                fill_w = max(1, int(w * pct_for_bar))
+                # градиент воды: от тёмно-синего к голубому
+                bar_outer.create_rectangle(0, 0, fill_w, h, fill="#1a6b8a", outline="")
+                bar_outer.create_rectangle(0, 0, fill_w, h // 2, fill="#2196a8", outline="")
+
+        bar_outer.after(50, _draw_wc_bar)
+        bar_outer.bind("<Configure>", lambda e: _draw_wc_bar())
 
     # ------------------------------------------------------------------
     # Внесено за неделю — горизонтальные бары

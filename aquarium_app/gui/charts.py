@@ -715,24 +715,6 @@ def on_chart_hover(canvas, event):
         for fert_name, dose_val in dose_list:
             tip_lines.append(("dose_split", fert_name, dose_val))
 
-    # ===== БЛОК 4: Последняя подмена (только если в ЭТОТ день не было подмены) =====
-    if hover_date and hover_iso not in wc_dates_set:
-        prev_wc = [d for d in wc_dates_set if d < hover_iso]
-        if prev_wc:
-            try:
-                last_wc = max(dt.date.fromisoformat(d) for d in prev_wc)
-                days_wc = (hover_date - last_wc).days
-                if hover_date == dt.date.today() and days_wc == 0:
-                    wc_text = "Последняя подмена: сегодня"
-                elif days_wc == 1:
-                    wc_text = "Последняя подмена: вчера"
-                else:
-                    wc_text = f"Последняя подмена: {days_wc} дн. назад"
-                tip_lines.append(("sep", "", ""))
-                tip_lines.append(("meta", wc_text, "#20c997"))
-            except Exception:
-                pass
-
     # --- дата ---
     if isinstance(raw_date, dt.date):
         date_str = raw_date.strftime("%d.%m.%Y")
