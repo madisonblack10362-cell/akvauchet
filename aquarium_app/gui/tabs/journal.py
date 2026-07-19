@@ -17,9 +17,10 @@ from aquarium_app.db import (
     get_aquarium, get_targets, get_journal_data,
     get_parameter_history,
 )
-from aquarium_app.logic.formatters import from_iso, parse_float
+from aquarium_app.logic.formatters import from_iso, to_iso, parse_float, today_str
 from aquarium_app.logic.calculations import out_of_range_flags
 from aquarium_app.gui.charts import draw_param_trend_chart, schedule_chart_draw
+from aquarium_app.gui.widgets import DateEntry
 
 from collections import Counter
 
@@ -59,9 +60,12 @@ class JournalTab:
         self.journal_aq_combo.bind("<<ComboboxSelected>>",
                                     lambda e: self.refresh_journal())
 
-        # фильтры периода
-        self._journal_filter_var = tk.StringVar(value="7d")
-        filter_data = [("7d", "7 дн"), ("30d", "30 дн"), ("90d", "90 дн"), ("all", "Всё")]
+        # фильтры периода: неделя / 2 недели / месяц / произвольный
+        self._journal_filter_var = tk.StringVar(value="week")
+        filter_data = [
+            ("week", "Неделя"), ("2weeks", "2 недели"),
+            ("month", "Месяц"), ("custom", "..."),
+        ]
         self._journal_filter_btns = {}
         for key, label in filter_data:
             b = tk.Button(top, text=label, font=(FF, 8), relief="flat",
@@ -70,6 +74,29 @@ class JournalTab:
                           command=lambda k=key: self._set_journal_filter(k))
             b.pack(side="left", padx=2)
             self._journal_filter_btns[key] = b
+
+        # --- строка произвольного диапазона (скрыта по умолчанию) ---
+        self._journal_custom_frame = tk.Frame(parent, bg=COLOR_BG)
+        self._journal_custom_frame.pack(fill="x", padx=12, pady=(0, 2))
+        tk.Label(self._journal_custom_frame, text="С:", bg=COLOR_BG,
+                 fg=COLOR_TEXT_MUTED, font=(FF, 9)).pack(side="left")
+        monday = dt.date.today() - dt.timedelta(days=dt.date.today().weekday())
+        self._journal_from_entry = DateEntry(
+            self._journal_custom_frame, font_family=FF, width=12,
+            default=monday.strftime("%d.%m.%Y"))
+        self._journal_from_entry.pack(side="left", padx=(2, 8))
+        tk.Label(self._journal_custom_frame, text="По:", bg=COLOR_BG,
+                 fg=COLOR_TEXT_MUTED, font=(FF, 9)).pack(side="left")
+        self._journal_to_entry = DateEntry(
+            self._journal_custom_frame, font_family=FF, width=12,
+            default=dt.date.today().strftime("%d.%m.%Y"))
+        self._journal_to_entry.pack(side="left", padx=(2, 8))
+        tk.Button(self._journal_custom_frame, text="Показать", font=(FF, 9),
+                  relief="flat", bg=COLOR_ACCENT, fg="#151515",
+                  activebackground=COLOR_ACCENT_HOVER, borderwidth=0,
+                  padx=10, pady=2, cursor="hand2",
+                  command=self._apply_journal_custom).pack(side="left")
+        self._journal_custom_frame.pack_forget()
 
         # кнопки действий
         tk.Button(top, text="+ Показания", font=(FF, 9), relief="flat",
@@ -164,7 +191,63 @@ class JournalTab:
     def _set_journal_filter(self, key):
         self._journal_filter_var.set(key)
         self._update_journal_filter_buttons()
+        # показать/скрыть строку произвольного диапазона
+        if key == "custom":
+            self._journal_custom_frame.pack(fill="x", padx=12, pady=(0, 2),
+                                             before=self._journal_stats_frame)
+        else:
+            self._journal_custom_frame.pack_forget()
         self.refresh_journal()
+
+    def _apply_journal_custom(self):
+        """Кнопка «Показать» для произвольного диапазона."""
+        self.refresh_journal()
+
+    def _journal_date_range(self):
+        """Возвращает (date_from_iso, date_to_iso) по текущему фильтру.
+
+        week      — текущая неделя: пн 00:00 … вс 23:59
+        2weeks    — последние 2 недели: пн 14 дней назад … вс текущей
+        month     — текущий месяц: 1-е … последний день
+        custom    — из полей DateEntry
+        """
+        key = self._journal_filter_var.get()
+        today = dt.date.today()
+        weekday = today.weekday()  # 0=пн … 6=вс
+
+        if key == "week":
+            monday = today - dt.timedelta(days=weekday)
+            sunday = monday + dt.timedelta(days=6)
+            return monday.isoformat(), sunday.isoformat()
+
+        if key == "2weeks":
+            this_monday = today - dt.timedelta(days=weekday)
+            prev_monday = this_monday - dt.timedelta(days=14)
+            this_sunday = this_monday + dt.timedelta(days=6)
+            return prev_monday.isoformat(), this_sunday.isoformat()
+
+        if key == "month":
+            first = today.replace(day=1)
+            last = (today.replace(day=28) + dt.timedelta(days=4)).replace(day=1) - dt.timedelta(days=1)
+            return first.isoformat(), last.isoformat()
+
+        if key == "custom":
+            try:
+                d_from = dt.datetime.strptime(
+                    self._journal_from_entry.get().strip(), "%d.%m.%Y").date()
+            except Exception:
+                d_from = None
+            try:
+                d_to = dt.datetime.strptime(
+                    self._journal_to_entry.get().strip(), "%d.%m.%Y").date()
+            except Exception:
+                d_to = None
+            return (
+                d_from.isoformat() if d_from else None,
+                d_to.isoformat() if d_to else None,
+            )
+
+        return None, None
 
     def _update_journal_filter_buttons(self):
         current = self._journal_filter_var.get()
@@ -187,13 +270,7 @@ class JournalTab:
             self.journal_count_label.config(text="")
             return
 
-        filter_key = self._journal_filter_var.get()
-        date_from = None
-        date_to = None
-        if filter_key != "all":
-            days = int(filter_key.replace("d", ""))
-            date_from = (dt.date.today() - dt.timedelta(days=days)).isoformat()
-
+        date_from, date_to = self._journal_date_range()
         days_data = get_journal_data(self.conn, aq_id, date_from, date_to)
 
         aq = get_aquarium(self.conn, aq_id)
