@@ -25,9 +25,10 @@ from aquarium_app.config import (
     MEASURED_PARAMS,
 )
 from aquarium_app.db import get_aquariums, get_aquarium, get_readings, get_dosing
-from aquarium_app.logic.calculations import out_of_range_flags, sum_last_n_days
+from aquarium_app.logic.calculations import out_of_range_flags, sum_range_totals
 from aquarium_app.logic.formatters import from_iso
 from aquarium_app.gui.charts import draw_element_bars, schedule_chart_draw
+from aquarium_app.gui.widgets import DateEntry
 
 
 class DashboardTab:
@@ -46,6 +47,49 @@ class DashboardTab:
                   bg=COLOR_CARD, fg=COLOR_ACCENT, activebackground=COLOR_ALT_ROW,
                   activeforeground=COLOR_ACCENT, borderwidth=0, padx=10, pady=3,
                   command=self.refresh_dashboard, cursor="hand2").pack(side="right")
+
+        # --- фильтр периода для «Внесено» ---
+        filter_bar = tk.Frame(tab, bg=COLOR_BG)
+        filter_bar.pack(fill="x", padx=16, pady=(4, 0))
+        tk.Label(filter_bar, text="Период:", bg=COLOR_BG, fg=COLOR_TEXT_MUTED,
+                 font=(FF, 9)).pack(side="left")
+        self._dash_filter_var = tk.StringVar(value="week")
+        filter_data = [
+            ("week", "Неделя"), ("2weeks", "2 недели"),
+            ("month", "Месяц"), ("custom", "..."),
+        ]
+        self._dash_filter_btns = {}
+        for key, label in filter_data:
+            b = tk.Button(filter_bar, text=label, font=(FF, 8), relief="flat",
+                          bg=COLOR_ALT_ROW, fg=COLOR_TEXT_MUTED, borderwidth=0,
+                          padx=8, pady=2, cursor="hand2",
+                          command=lambda k=key: self._set_dash_filter(k))
+            b.pack(side="left", padx=2)
+            self._dash_filter_btns[key] = b
+        self._update_dash_filter_buttons()
+
+        # строка произвольного диапазона (скрыта по умолчанию)
+        self._dash_custom_frame = tk.Frame(tab, bg=COLOR_BG)
+        self._dash_custom_frame.pack(fill="x", padx=16, pady=(0, 0))
+        tk.Label(self._dash_custom_frame, text="С:", bg=COLOR_BG,
+                 fg=COLOR_TEXT_MUTED, font=(FF, 9)).pack(side="left")
+        monday = dt.date.today() - dt.timedelta(days=dt.date.today().weekday())
+        self._dash_from_entry = DateEntry(
+            self._dash_custom_frame, font_family=FF, width=12,
+            default=monday.strftime("%d.%m.%Y"))
+        self._dash_from_entry.pack(side="left", padx=(2, 8))
+        tk.Label(self._dash_custom_frame, text="По:", bg=COLOR_BG,
+                 fg=COLOR_TEXT_MUTED, font=(FF, 9)).pack(side="left")
+        self._dash_to_entry = DateEntry(
+            self._dash_custom_frame, font_family=FF, width=12,
+            default=dt.date.today().strftime("%d.%m.%Y"))
+        self._dash_to_entry.pack(side="left", padx=(2, 8))
+        tk.Button(self._dash_custom_frame, text="Показать", font=(FF, 9),
+                  relief="flat", bg=COLOR_ACCENT, fg="#151515",
+                  activebackground=COLOR_ALT_ROW, borderwidth=0,
+                  padx=10, pady=2, cursor="hand2",
+                  command=self.refresh_dashboard).pack(side="left")
+        self._dash_custom_frame.pack_forget()
 
         # прокручиваемая область
         outer = tk.Frame(tab, bg=COLOR_BG)
@@ -72,6 +116,77 @@ class DashboardTab:
 
     def _dash_wheel(self, event):
         self.dash_canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+
+    # ------------------------------------------------------------------
+    # Фильтр периода
+    # ------------------------------------------------------------------
+
+    def _set_dash_filter(self, key):
+        self._dash_filter_var.set(key)
+        self._update_dash_filter_buttons()
+        if key == "custom":
+            self._dash_custom_frame.pack(fill="x", padx=16, pady=(0, 0))
+        else:
+            self._dash_custom_frame.pack_forget()
+        self.refresh_dashboard()
+
+    def _update_dash_filter_buttons(self):
+        current = self._dash_filter_var.get()
+        for k, btn in self._dash_filter_btns.items():
+            if k == current:
+                btn.config(bg=COLOR_ACCENT, fg="#151515")
+            else:
+                btn.config(bg=COLOR_ALT_ROW, fg=COLOR_TEXT_MUTED)
+
+    def _dash_date_range(self):
+        """(date_from_iso, date_to_iso) по текущему фильтру."""
+        key = self._dash_filter_var.get()
+        today = dt.date.today()
+        weekday = today.weekday()
+
+        if key == "week":
+            monday = today - dt.timedelta(days=weekday)
+            sunday = monday + dt.timedelta(days=6)
+            return monday.isoformat(), sunday.isoformat()
+
+        if key == "2weeks":
+            this_monday = today - dt.timedelta(days=weekday)
+            prev_monday = this_monday - dt.timedelta(days=14)
+            this_sunday = this_monday + dt.timedelta(days=6)
+            return prev_monday.isoformat(), this_sunday.isoformat()
+
+        if key == "month":
+            first = today.replace(day=1)
+            last = (today.replace(day=28) + dt.timedelta(days=4)).replace(day=1) - dt.timedelta(days=1)
+            return first.isoformat(), last.isoformat()
+
+        if key == "custom":
+            try:
+                d_from = dt.datetime.strptime(
+                    self._dash_from_entry.get().strip(), "%d.%m.%Y").date()
+            except Exception:
+                d_from = None
+            try:
+                d_to = dt.datetime.strptime(
+                    self._dash_to_entry.get().strip(), "%d.%m.%Y").date()
+            except Exception:
+                d_to = None
+            return (
+                d_from.isoformat() if d_from else None,
+                d_to.isoformat() if d_to else None,
+            )
+
+        return None, None
+
+    def _dash_period_label(self, date_from, date_to):
+        """Читаемая подпись периода для заголовка баров."""
+        key = self._dash_filter_var.get()
+        names = {"week": "Неделя", "2weeks": "2 недели", "month": "Месяц"}
+        if key in names:
+            d1 = dt.date.fromisoformat(date_from)
+            d2 = dt.date.fromisoformat(date_to)
+            return f"{names[key]} ({d1.strftime('%d.%m')} - {d2.strftime('%d.%m')})"
+        return f"Период ({date_from} - {date_to})"
 
     @staticmethod
     def _fert_color(dosing_row):
@@ -108,8 +223,10 @@ class DashboardTab:
                      font=(FF, 11), bg=COLOR_BG, fg=COLOR_TEXT_MUTED).pack(pady=40)
             return
 
+        date_from, date_to = self._dash_date_range()
+
         for aq in aquariums:
-            self._build_aquarium_card(container, aq)
+            self._build_aquarium_card(container, aq, date_from, date_to)
 
         container.update_idletasks()
         self.dash_canvas.configure(scrollregion=self.dash_canvas.bbox("all"))
@@ -118,7 +235,7 @@ class DashboardTab:
     # Карточка аквариума
     # ------------------------------------------------------------------
 
-    def _build_aquarium_card(self, parent, aq):
+    def _build_aquarium_card(self, parent, aq, date_from, date_to):
         FF = self.FF
         aq_id = aq["id"]
 
@@ -224,7 +341,7 @@ class DashboardTab:
         self._build_water_change_block(card, aq_id, readings)
 
         # --- внесено за неделю ---
-        self._build_weekly_dose_bars(card, aq_id)
+        self._build_weekly_dose_bars(card, aq_id, date_from, date_to)
 
         # --- отклонения параметров (внизу карточки) ---
         if readings:
@@ -338,14 +455,11 @@ class DashboardTab:
     # Внесено за неделю — горизонтальные бары
     # ------------------------------------------------------------------
 
-    def _build_weekly_dose_bars(self, card, aq_id):
+    def _build_weekly_dose_bars(self, card, aq_id, date_from, date_to):
         FF = self.FF
-        totals = sum_last_n_days(self.conn, aq_id, 7)
+        totals = sum_range_totals(self.conn, aq_id, date_from, date_to)
 
-        week_end = dt.date.today()
-        week_start = week_end - dt.timedelta(days=7)
-        bar_label = (f"Внесено за 7 дней ({week_start.strftime('%d.%m')} - "
-                     f"{week_end.strftime('%d.%m')}):")
+        bar_label = f"Внесено за {self._dash_period_label(date_from, date_to)}:"
         tk.Label(card, text=bar_label, font=(FF, 9, "bold"),
                  bg=COLOR_CARD, fg=COLOR_TEXT).pack(anchor="w", pady=(6, 2))
 
