@@ -308,12 +308,15 @@ def draw_param_trend_chart(
                 date_to_y[d] = (x, y)
             except Exception:
                 pass
+        prev_x = pad_l
         prev_y = strip_bottom - strip_h * 0.5  # середина полосы по умолчанию
+        seen_measurement = False
         d = period_start
         while d <= period_end:
             if d in date_to_y:
                 prev_x, prev_y = date_to_y[d]
-            elif d not in hist_date_set:
+                seen_measurement = True
+            elif d not in hist_date_set and seen_measurement:
                 tx = x_for_date(d.isoformat())
                 canvas.create_line(prev_x, prev_y, tx, prev_y,
                                    fill=color, width=1, dash=(4, 4))
