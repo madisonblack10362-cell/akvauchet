@@ -291,38 +291,48 @@ def draw_param_trend_chart(
         canvas.create_text(label_x, last_y, anchor="w", text=label,
                            fill=color, font=(font_family, 8, "bold"))
 
-        # --- пунктирное продолжение до «сегодня», если нет замера ---
+        # --- пунктир + "—" на каждую дату без замера после последнего ---
         try:
             last_d = dt.date.fromisoformat(hist[-1][0])
         except Exception:
             last_d = None
-        if last_d and last_d < today:
-            tx = x_for_date(today.isoformat())
-            canvas.create_line(last_x, last_y, tx, last_y,
-                               fill=color, width=1, dash=(4, 4))
-            r = 3
-            canvas.create_oval(tx - r, last_y - r, tx + r, last_y + r,
-                               outline=color, width=1.5, dash=(2, 2))
-            canvas.create_text(tx, last_y - 9, text="—",
-                               fill=COLOR_TEXT_MUTED, font=(font_family, 7))
-            hover_points.append({
-                "x": tx, "y": last_y,
-                "date": today.isoformat(), "value": None,
-                "label": label, "color": color,
-                "_key": key, "_is_wc": False, "_no_data": True,
-            })
+        hist_dates = set()
+        for date_iso, _ in hist:
+            try:
+                hist_dates.add(dt.date.fromisoformat(date_iso))
+            except Exception:
+                pass
+        if last_d and last_d < period_end:
+            prev_x = last_x
+            d = last_d + dt.timedelta(days=1)
+            while d <= period_end:
+                tx = x_for_date(d.isoformat())
+                canvas.create_line(prev_x, last_y, tx, last_y,
+                                   fill=color, width=1, dash=(4, 4))
+                r = 3
+                canvas.create_oval(tx - r, last_y - r, tx + r, last_y + r,
+                                   outline=color, width=1.5, dash=(2, 2))
+                canvas.create_text(tx, last_y - 9, text="—",
+                                   fill=COLOR_TEXT_MUTED, font=(font_family, 7))
+                hover_points.append({
+                    "x": tx, "y": last_y,
+                    "date": d.isoformat(), "value": None,
+                    "label": label, "color": color,
+                    "_key": key, "_is_wc": False, "_no_data": True,
+                })
+                prev_x = tx
+                d += dt.timedelta(days=1)
 
-    # ---- подписи оси X (даты начала и конца периода) ----
+    # ---- подписи оси X: все даты периода ----
     axis_y = h - 2
-    canvas.create_text(pad_l, axis_y, anchor="sw", text=period_start.strftime("%d.%m"),
-                       fill=COLOR_TEXT_MUTED, font=(font_family, 7))
-    canvas.create_text(pad_l + plot_w, axis_y, anchor="se", text=period_end.strftime("%d.%m"),
-                       fill=COLOR_TEXT_MUTED, font=(font_family, 7))
-    if span_days > 3:
-        mid_date = period_start + dt.timedelta(days=span_days // 2)
-        mid_x = x_for_date(mid_date.isoformat())
-        canvas.create_text(mid_x, axis_y, anchor="s", text=mid_date.strftime("%d.%m"),
+    # показываем каждую дату если ≤14 дней, иначе через одну
+    step = 1 if span_days <= 14 else 2
+    d = period_start
+    while d <= period_end:
+        x = x_for_date(d.isoformat())
+        canvas.create_text(x, axis_y, anchor="s", text=d.strftime("%d.%m"),
                            fill=COLOR_TEXT_MUTED, font=(font_family, 7))
+        d += dt.timedelta(days=step)
 
     # подсказка при наведении курсора
     canvas._hover_points = hover_points
