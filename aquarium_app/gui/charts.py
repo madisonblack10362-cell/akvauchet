@@ -848,7 +848,7 @@ def on_chart_hover(canvas, event):
             row_f.pack(fill="x")
             tk.Label(row_f, text=f"{fert_name}: ", bg="#05060a", fg=elem_clr,
                      font=(ff, 8), anchor="w", pady=0).pack(side="left")
-            tk.Label(row_f, text=f"+{fmt_axis(dose_val)} мл", bg="#05060a", fg="#6bcb77",
+            tk.Label(row_f, text=f"+{round(dose_val, 1):g} мл", bg="#05060a", fg="#6bcb77",
                      font=(ff, 8), anchor="w", pady=0).pack(side="left")
             continue
         _lbl, text, color = item[0], item[1], item[2]
