@@ -338,7 +338,7 @@ class DashboardTab:
                      bg=COLOR_CARD, fg=COLOR_TEXT_MUTED).pack(anchor="w")
 
         # --- подмена воды: дней до следующей + краткая статистика ---
-        self._build_water_change_block(card, aq_id, readings)
+        self._build_water_change_block(card, aq_id, date_from, date_to)
 
         # --- внесено за неделю ---
         self._build_weekly_dose_bars(card, aq_id, date_from, date_to)
@@ -360,27 +360,51 @@ class DashboardTab:
     # Блок подмены воды (прогресс-бар с заливкой по %)
     # ------------------------------------------------------------------
 
-    def _build_water_change_block(self, card, aq_id, readings):
+    def _build_water_change_block(self, card, aq_id, date_from, date_to):
         FF = self.FF
 
         wc_frame = tk.Frame(card, bg=COLOR_CARD)
         wc_frame.pack(fill="x", pady=(6, 0))
 
-        # находим последнюю подмену из readings
-        last_wc_date = None
-        last_wc_pct = None
-        for r in (readings or []):
-            if r.get("water_change_pct") is not None or r.get("water_change_l") is not None:
-                last_wc_date = r["date"]
-                last_wc_pct = r.get("water_change_pct")
-                if last_wc_pct is None and r.get("water_change_l"):
-                    aq = get_aquarium(self.conn, aq_id)
-                    vol = aq["volume_l"] if aq else 0
-                    if vol and vol > 0:
-                        last_wc_pct = round(r["water_change_l"] / vol * 100, 1)
-                break
+        # собираем все подмены за выбранный период
+        wc_where = ["aquarium_id=?"]
+        wc_params: list = [aq_id]
+        if date_from:
+            wc_where.append("date>=?")
+            wc_params.append(date_from)
+        if date_to:
+            wc_where.append("date<=?")
+            wc_params.append(date_to)
+        wc_sql = " AND ".join(wc_where)
 
-        # рассчитываем дней до следующей подмены
+        wc_rows = self.conn.execute(
+            f"SELECT date, water_change_pct, water_change_l FROM readings WHERE {wc_sql} "
+            "AND (water_change_pct IS NOT NULL OR water_change_l IS NOT NULL) "
+            "ORDER BY date DESC", wc_params
+        ).fetchall()
+
+        # суммарный % за период
+        aq = get_aquarium(self.conn, aq_id)
+        vol = aq["volume_l"] if aq else 0
+        total_pct = 0.0
+        for r in wc_rows:
+            pct = r["water_change_pct"]
+            if pct is None and r["water_change_l"] and vol:
+                pct = round(r["water_change_l"] / vol * 100, 1)
+            if pct:
+                total_pct += pct
+        total_pct = min(total_pct, 100)
+
+        # последняя подмена (для текста и прогноза)
+        last_wc_date = wc_rows[0]["date"] if wc_rows else None
+        last_wc_pct = None
+        if wc_rows:
+            p = wc_rows[0]["water_change_pct"]
+            if p is None and wc_rows[0].get("water_change_l") and vol:
+                p = round(wc_rows[0]["water_change_l"] / vol * 100, 1)
+            last_wc_pct = p
+
+        # рассчитываем дней до следующей подмены от последней
         days_since = None
         days_until = None
         if last_wc_date:
@@ -389,10 +413,9 @@ class DashboardTab:
                 days_since = (dt.date.today() - wc_d).days
                 if last_wc_pct and last_wc_pct >= 30:
                     interval = max(4, int(10 - last_wc_pct / 10))
-                    days_until = max(0, interval - days_since)
                 else:
                     interval = 7
-                    days_until = max(0, interval - days_since)
+                days_until = max(0, interval - days_since)
             except (ValueError, TypeError):
                 pass
 
@@ -400,9 +423,9 @@ class DashboardTab:
         top_row = tk.Frame(wc_frame, bg=COLOR_CARD)
         top_row.pack(fill="x", padx=4, pady=(4, 2))
 
-        if last_wc_date:
-            pct_str = f" {last_wc_pct:.0f}%" if last_wc_pct else ""
-            wc_main = f"Подмена{pct_str} — {from_iso(last_wc_date)}"
+        if wc_rows:
+            count_txt = f" ({len(wc_rows)} подм.)" if len(wc_rows) > 1 else ""
+            wc_main = f"Подмена{count_txt} — итого {total_pct:.0f}%"
             if days_since is not None:
                 if days_since == 0:
                     wc_main += " (сегодня)"
@@ -423,18 +446,17 @@ class DashboardTab:
                 tk.Label(top_row, text=hint, font=(FF, 10, "bold"),
                          bg=COLOR_CARD, fg=hclr).pack(side="right")
         else:
-            tk.Label(top_row, text="Подмен ещё не было", font=(FF, 9),
+            tk.Label(top_row, text="Подмен за период нет", font=(FF, 9),
                      bg=COLOR_CARD, fg=COLOR_TEXT_MUTED).pack(side="left")
             tk.Label(top_row, text="Пора!", font=(FF, 10, "bold"),
                      bg=COLOR_CARD, fg=COLOR_WARN_TEXT).pack(side="right")
 
-        # прогресс-бар: заливка по проценту подмены, цвет воды
+        # прогресс-бар: заливка по суммарному %, цвет воды
         bar_outer = tk.Canvas(wc_frame, bg=COLOR_BORDER, highlightthickness=0, height=8)
         bar_outer.pack(fill="x", padx=4, pady=(2, 6))
         bar_outer.update_idletasks()
 
-        # откладываем заливку чтобы canvas получил реальную ширину
-        pct_for_bar = min(last_wc_pct or 0, 100) / 100.0
+        pct_for_bar = min(total_pct, 100) / 100.0
 
         def _draw_wc_bar():
             if not bar_outer.winfo_exists():
@@ -444,7 +466,6 @@ class DashboardTab:
             bar_outer.delete("all")
             if pct_for_bar > 0:
                 fill_w = max(1, int(w * pct_for_bar))
-                # градиент воды: от тёмно-синего к голубому
                 bar_outer.create_rectangle(0, 0, fill_w, h, fill="#1a6b8a", outline="")
                 bar_outer.create_rectangle(0, 0, fill_w, h // 2, fill="#2196a8", outline="")
 
