@@ -223,6 +223,10 @@ class ReadingsTab:
 
     def _on_readings_aq_changed(self):
         self.refresh_readings_table()
+        # прямая перерисовка — чтобы при переключении аквариума
+        # график обновлялся мгновенно, а не через отложенный after(50)
+        self.refresh_readings_trend()
+        # отложенный вызов остаётся для корректной отрисовки при ресайзе
         self._schedule_trend_chart_draw()
 
     def _current_read_aq_id(self):
