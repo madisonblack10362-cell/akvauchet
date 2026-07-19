@@ -764,10 +764,10 @@ def on_chart_hover(canvas, event):
                 consumed = -delta
                 if consumed > 0:
                     val_color = "#e88a8a"
-                    consumed_text = f"-{fmt_axis(consumed)}"
+                    consumed_text = f"-{fmt_axis(consumed, key=pkey)}"
                 else:
                     val_color = "#6bcb77"
-                    consumed_text = f"+{fmt_axis(-consumed)}"
+                    consumed_text = f"+{fmt_axis(-consumed, key=pkey)}"
                 consumed_lines.append((label, color, consumed_text, val_color))
 
     if consumed_lines:
@@ -848,7 +848,7 @@ def on_chart_hover(canvas, event):
             row_f.pack(fill="x")
             tk.Label(row_f, text=f"{fert_name}: ", bg="#05060a", fg=elem_clr,
                      font=(ff, 8), anchor="w", pady=0).pack(side="left")
-            tk.Label(row_f, text=f"+{dose_val} мл", bg="#05060a", fg="#6bcb77",
+            tk.Label(row_f, text=f"+{fmt_axis(dose_val)} мл", bg="#05060a", fg="#6bcb77",
                      font=(ff, 8), anchor="w", pady=0).pack(side="left")
             continue
         _lbl, text, color = item[0], item[1], item[2]
