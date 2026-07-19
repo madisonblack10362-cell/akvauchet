@@ -438,17 +438,15 @@ class DashboardTab:
 
             if days_until is not None:
                 if days_until <= 0:
-                    hint, hclr = "Пора!", COLOR_WARN_TEXT
+                    hint, hclr = "Следующая подмена — пора!", COLOR_WARN_TEXT
                 elif days_until == 1:
-                    hint, hclr = "Завтра", COLOR_STATUS_WAITING
+                    hint, hclr = "Следующая подмена — завтра", COLOR_STATUS_WAITING
                 else:
-                    hint, hclr = f"Через {days_until} дн.", COLOR_TEXT_MUTED
+                    hint, hclr = f"Следующая подмена через {days_until} дн.", COLOR_TEXT_MUTED
                 tk.Label(top_row, text=hint, font=(FF, 10, "bold"),
                          bg=COLOR_CARD, fg=hclr).pack(side="right")
         else:
-            tk.Label(top_row, text="Подмен за период нет", font=(FF, 9),
-                     bg=COLOR_CARD, fg=COLOR_TEXT_MUTED).pack(side="left")
-            tk.Label(top_row, text="Пора!", font=(FF, 10, "bold"),
+            tk.Label(top_row, text="Подмен за период нет — пора!", font=(FF, 10, "bold"),
                      bg=COLOR_CARD, fg=COLOR_WARN_TEXT).pack(side="right")
 
         # прогресс-бар: заливка по суммарному %, цвет воды
