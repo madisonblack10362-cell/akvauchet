@@ -223,10 +223,24 @@ class ReadingsTab:
 
     def _on_readings_aq_changed(self):
         self.refresh_readings_table()
-        # прямая перерисовка — чтобы при переключении аквариума
-        # график обновлялся мгновенно, а не через отложенный after(50)
+        # При переключении аквариума: сбрасываем ВСЕ отложенные
+        # перерисовки и старые on_resize-хэндлеры на canvas,
+        # чтобы они не перезаписали график старыми данными.
+        c = self.readings_trend_canvas
+        # инкрементим gen чтобы все старые deferred_draw/on_resize
+        # проигнорировали свою генерацию
+        c._chart_draw_gen = getattr(c, '_chart_draw_gen', 0) + 1
+        # развязываем ВСЕ Configure-хэндлеры (они накопились от
+        # каждого вызова schedule_chart_draw)
+        try:
+            c.unbind('<Configure>')
+        except Exception:
+            pass
+        # отмена всех pending after-коллбэков (простой способ —
+        # инкремент gen уже сделал это)
+        # Теперь чисто рисуем график для текущего аквариума
         self.refresh_readings_trend()
-        # отложенный вызов остаётся для корректной отрисовки при ресайзе
+        # И заново ставим schedule для ресайза
         self._schedule_trend_chart_draw()
 
     def _current_read_aq_id(self):
