@@ -270,6 +270,7 @@ def draw_param_trend_chart(
                                fill=COLOR_TEXT_MUTED, font=(font_family, 7))
 
         points = []
+        hist_date_set = set()
         for date_iso, v in hist:
             x = x_for_date(date_iso)
             frac = (v - local_min) / (local_max - local_min)
@@ -278,6 +279,10 @@ def draw_param_trend_chart(
             hover_points.append({"x": x, "y": y, "date": date_iso, "value": v,
                                   "label": label, "color": color,
                                   "_key": key, "_is_wc": key == "_wc"})
+            try:
+                hist_date_set.add(dt.date.fromisoformat(date_iso))
+            except Exception:
+                pass
 
         for i in range(len(points) - 1):
             canvas.create_line(points[i][0], points[i][1],
@@ -291,37 +296,40 @@ def draw_param_trend_chart(
         canvas.create_text(label_x, last_y, anchor="w", text=label,
                            fill=color, font=(font_family, 8, "bold"))
 
-        # --- пунктир + "—" на каждую дату без замера после последнего ---
-        try:
-            last_d = dt.date.fromisoformat(hist[-1][0])
-        except Exception:
-            last_d = None
-        hist_dates = set()
-        for date_iso, _ in hist:
+        # --- "—" на каждую дату без замера (всё время, не только после последнего) ---
+        # определяем Y для каждой даты: берём Y от ближайшего предыдущего замера
+        date_to_y = {}
+        for date_iso, v in hist:
             try:
-                hist_dates.add(dt.date.fromisoformat(date_iso))
+                d = dt.date.fromisoformat(date_iso)
+                x = x_for_date(date_iso)
+                frac = (v - local_min) / (local_max - local_min)
+                y = strip_bottom - strip_h * frac
+                date_to_y[d] = (x, y)
             except Exception:
                 pass
-        if last_d and last_d < period_end:
-            prev_x = last_x
-            d = last_d + dt.timedelta(days=1)
-            while d <= period_end:
+        prev_y = strip_bottom - strip_h * 0.5  # середина полосы по умолчанию
+        d = period_start
+        while d <= period_end:
+            if d in date_to_y:
+                prev_x, prev_y = date_to_y[d]
+            elif d not in hist_date_set:
                 tx = x_for_date(d.isoformat())
-                canvas.create_line(prev_x, last_y, tx, last_y,
+                canvas.create_line(prev_x, prev_y, tx, prev_y,
                                    fill=color, width=1, dash=(4, 4))
                 r = 3
-                canvas.create_oval(tx - r, last_y - r, tx + r, last_y + r,
+                canvas.create_oval(tx - r, prev_y - r, tx + r, prev_y + r,
                                    outline=color, width=1.5, dash=(2, 2))
-                canvas.create_text(tx, last_y - 9, text="—",
+                canvas.create_text(tx, prev_y - 9, text="—",
                                    fill=COLOR_TEXT_MUTED, font=(font_family, 7))
                 hover_points.append({
-                    "x": tx, "y": last_y,
+                    "x": tx, "y": prev_y,
                     "date": d.isoformat(), "value": None,
                     "label": label, "color": color,
                     "_key": key, "_is_wc": False, "_no_data": True,
                 })
                 prev_x = tx
-                d += dt.timedelta(days=1)
+            d += dt.timedelta(days=1)
 
     # ---- подписи оси X: все даты периода ----
     axis_y = h - 2
