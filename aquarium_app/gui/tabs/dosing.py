@@ -190,18 +190,18 @@ class DosingTab:
         # удобрения — просто Label + SpinEntry рядом
         self._dose_fert_entries: dict[int, tuple] = {}
         self._dose_fert_widgets_frame = row1  # чтобы перестраивать
-
-        # комментарий создаём до rebuild, но пэкуем внутри rebuild (после удобрений)
-        self.dose_comment_var = tk.StringVar()
-        self._dose_comment_label = tk.Label(row1, text="Коммент:", font=(FF, 8),
-                                            bg=COLOR_CARD, fg=COLOR_TEXT_MUTED)
-        self._dose_comment_entry = ttk.Entry(row1, textvariable=self.dose_comment_var, width=12)
         self._rebuild_dose_fert_grid()
 
+        # кнопка — правый край
         tk.Button(row1, text="Добавить", font=(FF, 9, "bold"), relief="flat",
                   bg=COLOR_ACCENT, fg="#151515", activebackground=COLOR_ACCENT_HOVER,
                   activeforeground="#151515", borderwidth=0, padx=12, pady=3,
                   command=self.add_dosing_entries, cursor="hand2").pack(side="right")
+        # комментарий — слева от кнопки
+        self.dose_comment_var = tk.StringVar()
+        ttk.Entry(row1, textvariable=self.dose_comment_var, width=10).pack(side="right")
+        tk.Label(row1, text="Коммент:", font=(FF, 8), bg=COLOR_CARD,
+                 fg=COLOR_TEXT_MUTED).pack(side="right")
 
         # строка 2: превью прироста
         row2 = tk.Frame(add_frame, bg=COLOR_CARD)
@@ -412,10 +412,6 @@ class DosingTab:
             spin.pack(side="left", padx=(2, 0))
             self._dose_fert_entries[fert["id"]] = (fert, spin)
             spin.var.trace_add("write", lambda *_: self._update_dose_preview())
-
-        # комментарий — всегда после всех удобрений
-        self._dose_comment_label.pack(side="left", padx=(8, 2))
-        self._dose_comment_entry.pack(side="left")
 
     # ------------------------------------------------------------------
     # Обновление таблицы дозировок (по датам, как показания)
