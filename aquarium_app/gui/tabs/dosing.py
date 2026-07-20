@@ -192,11 +192,11 @@ class DosingTab:
         self._dose_fert_widgets_frame = row1  # чтобы перестраивать
         self._rebuild_dose_fert_grid()
 
-        # комментарий между удобрениями и кнопкой (side=left → справа от удобрений)
+        # комментарий между удобрениями и кнопкой (side=right, после кнопки в коде = слева от неё)
         self.dose_comment_var = tk.StringVar()
+        ttk.Entry(row1, textvariable=self.dose_comment_var, width=10).pack(side="right")
         tk.Label(row1, text="Коммент:", font=(FF, 8), bg=COLOR_CARD,
-                 fg=COLOR_TEXT_MUTED).pack(side="left", padx=(8, 2))
-        ttk.Entry(row1, textvariable=self.dose_comment_var, width=14).pack(side="left")
+                 fg=COLOR_TEXT_MUTED).pack(side="right", padx=(8, 2))
 
         tk.Button(row1, text="Добавить", font=(FF, 9, "bold"), relief="flat",
                   bg=COLOR_ACCENT, fg="#151515", activebackground=COLOR_ACCENT_HOVER,
