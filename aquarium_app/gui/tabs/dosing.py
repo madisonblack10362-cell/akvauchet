@@ -29,6 +29,24 @@ from aquarium_app.gui.charts import (
 )
 from aquarium_app.gui.widgets import DateEntry, SpinEntry
 
+# Желаемый порядок удобрений в таблице и форме: Фосфат → Нитрат → Калий → Микро → остальные
+_FERT_DISPLAY_ORDER = {"po4": 0, "no3": 1, "k": 2}
+
+
+def _sort_ferts(ferts):
+    """Сортирует удобрения: Фосфат, Нитрат, Калий, Микро, остальные — по id."""
+    def _key(f):
+        name = (f.get("name") or "").lower()
+        is_micro = "микро" in name or "micro" in name
+        if is_micro:
+            return (3, f["id"])
+        for ek, order in _FERT_DISPLAY_ORDER.items():
+            if f.get(ek):
+                return (order, f["id"])
+        return (4, f["id"])
+    return sorted(ferts, key=_key)
+
+
 # Ключевые элементы для сводных карточек
 SUMMARY_KEYS = ["po4", "no3", "k", "fe", "mg"]
 SUMMARY_INFO = {
@@ -161,7 +179,7 @@ class DosingTab:
                                   bg=COLOR_CARD, fg=COLOR_ACCENT, bd=1, relief="solid")
         add_frame.pack(fill="x", padx=12, pady=4)
 
-        # строка 1: дата + удобрения + кнопка
+        # строка 1: дата + удобрения + комментарий + кнопка
         row1 = tk.Frame(add_frame, bg=COLOR_CARD)
         row1.pack(fill="x", padx=8, pady=(4, 2))
         tk.Label(row1, text="Дата:", font=(FF, 9), bg=COLOR_CARD,
@@ -179,15 +197,17 @@ class DosingTab:
                   activeforeground="#151515", borderwidth=0, padx=12, pady=3,
                   command=self.add_dosing_entries, cursor="hand2").pack(side="right")
 
-        # строка 2: превью + комментарий
+        # комментарий в той же строке, перед кнопкой
+        self.dose_comment_var = tk.StringVar()
+        tk.Label(row1, text="Коммент:", font=(FF, 8), bg=COLOR_CARD,
+                 fg=COLOR_TEXT_MUTED).pack(side="right", padx=(8, 2))
+        ttk.Entry(row1, textvariable=self.dose_comment_var, width=16).pack(side="right")
+
+        # строка 2: превью прироста
         row2 = tk.Frame(add_frame, bg=COLOR_CARD)
         row2.pack(fill="x", padx=8, pady=(0, 4))
         self._dose_preview_frame = tk.Frame(row2, bg=COLOR_CARD)
         self._dose_preview_frame.pack(side="left", fill="x", expand=True)
-        tk.Label(row2, text="Коммент:", font=(FF, 8), bg=COLOR_CARD,
-                 fg=COLOR_TEXT_MUTED).pack(side="left", padx=(8, 2))
-        self.dose_comment_var = tk.StringVar()
-        ttk.Entry(row2, textvariable=self.dose_comment_var, width=20).pack(side="left")
 
         # кнопки над таблицей
         btn_row = tk.Frame(inner, bg=COLOR_BG)
@@ -366,7 +386,7 @@ class DosingTab:
                     pass
         self._dose_fert_entries = {}
 
-        ferts = get_fertilizers(self.conn)
+        ferts = _sort_ferts(get_fertilizers(self.conn))
         if not ferts:
             return
         FF = self.FF
@@ -420,7 +440,7 @@ class DosingTab:
         rows = get_dosing_filtered(self.conn, aq_id,
                                     date_from=date_from, date_to=date_to)
 
-        ferts = get_fertilizers(self.conn)
+        ferts = _sort_ferts(get_fertilizers(self.conn))
         self._dose_table_ferts = ferts
 
         tree = self.dose_tree
@@ -589,7 +609,7 @@ class DosingTab:
     def _dosing_date_dialog(self, title, date_iso, current_doses, current_comment):
         """Диалог с датой + все удобрения с текущими дозами. Возвращает (dict, comment) или None."""
         FF = self.FF
-        ferts = get_fertilizers(self.conn)
+        ferts = _sort_ferts(get_fertilizers(self.conn))
 
         dlg = tk.Toplevel(self)
         dlg.title(title)
