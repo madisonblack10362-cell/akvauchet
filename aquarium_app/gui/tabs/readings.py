@@ -128,11 +128,12 @@ class ReadingsTab:
                                           fg=COLOR_TEXT_MUTED, font=(FF, 9))
         self.read_wc_pct_label.pack(side="left", padx=(4, 0))
 
-        # комментарий + кнопка
+        # комментарий после литров
         self.read_comment_var = tk.StringVar()
-        ttk.Entry(row, textvariable=self.read_comment_var, width=14).pack(side="right")
         tk.Label(row, text="Коммент:", font=(FF, 8), bg=COLOR_CARD,
-                 fg=COLOR_TEXT_MUTED).pack(side="right", padx=(8, 2))
+                 fg=COLOR_TEXT_MUTED).pack(side="left", padx=(8, 2))
+        ttk.Entry(row, textvariable=self.read_comment_var, width=14).pack(side="left")
+
         tk.Button(row, text="Добавить", font=(FF, 9, "bold"), relief="flat",
                   bg=COLOR_ACCENT, fg="#151515", activebackground=COLOR_ACCENT_HOVER,
                   activeforeground="#151515", borderwidth=0, padx=12, pady=3,
