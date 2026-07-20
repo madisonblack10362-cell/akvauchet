@@ -192,18 +192,14 @@ class DosingTab:
         self._dose_fert_widgets_frame = row1  # чтобы перестраивать
         self._rebuild_dose_fert_grid()
 
-        # правая группа: комментарий + кнопка (в sub-frame для отступа от края)
-        right_group = tk.Frame(row1, bg=COLOR_CARD)
-        right_group.pack(side="right", padx=(0, 0))
-
-        tk.Button(right_group, text="Добавить", font=(FF, 9, "bold"), relief="flat",
+        tk.Button(row1, text="Добавить", font=(FF, 9, "bold"), relief="flat",
                   bg=COLOR_ACCENT, fg="#151515", activebackground=COLOR_ACCENT_HOVER,
                   activeforeground="#151515", borderwidth=0, padx=12, pady=3,
                   command=self.add_dosing_entries, cursor="hand2").pack(side="right")
         self.dose_comment_var = tk.StringVar()
-        ttk.Entry(right_group, textvariable=self.dose_comment_var, width=10).pack(side="right")
-        tk.Label(right_group, text="Коммент:", font=(FF, 8), bg=COLOR_CARD,
-                 fg=COLOR_TEXT_MUTED).pack(side="right", padx=(12, 2))
+        ttk.Entry(row1, textvariable=self.dose_comment_var, width=12).pack(side="right", padx=(2, 4))
+        tk.Label(row1, text="Коммент:", font=(FF, 8), bg=COLOR_CARD,
+                 fg=COLOR_TEXT_MUTED).pack(side="right")
 
         # строка 2: превью прироста
         row2 = tk.Frame(add_frame, bg=COLOR_CARD)
