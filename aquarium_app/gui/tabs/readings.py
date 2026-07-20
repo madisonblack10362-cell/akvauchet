@@ -136,7 +136,7 @@ class ReadingsTab:
         # комментарий — по центру между полями и кнопкой
         self.read_comment_var = tk.StringVar()
         ttk.Entry(row, textvariable=self.read_comment_var, width=36).pack(side="right", padx=(0, 8))
-        tk.Label(row, text="Коммент:", font=(FF, 8), bg=COLOR_CARD,
+        tk.Label(row, text="Комментарий:", font=(FF, 8), bg=COLOR_CARD,
                  fg=COLOR_TEXT_MUTED).pack(side="right")
 
         # кнопки таблицы — отдельный ряд, всегда видны

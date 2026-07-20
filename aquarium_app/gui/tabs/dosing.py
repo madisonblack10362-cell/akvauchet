@@ -200,7 +200,7 @@ class DosingTab:
         # комментарий — по центру между удобрениями и кнопкой
         self.dose_comment_var = tk.StringVar()
         ttk.Entry(row1, textvariable=self.dose_comment_var, width=24).pack(side="right", padx=(0, 8))
-        tk.Label(row1, text="Коммент:", font=(FF, 8), bg=COLOR_CARD,
+        tk.Label(row1, text="Комментарий:", font=(FF, 8), bg=COLOR_CARD,
                  fg=COLOR_TEXT_MUTED).pack(side="right")
 
         # строка 2: превью прироста
