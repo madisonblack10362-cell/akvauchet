@@ -388,7 +388,7 @@ class JournalTab:
 
                 pill = tk.Frame(params_row, bg=bg_pill, padx=4, pady=1)
                 pill.pack(side="left", padx=(0, 4), pady=1)
-                lbl = tk.Label(pill, text=f"{formula}: {v:g} {unit}".strip(),
+                lbl = tk.Label(pill, text=f"{formula}: +{v:g} {unit}".strip(),
                                bg=bg_pill, fg=fg, font=(FF, 9, "bold"))
                 lbl.pack()
 
