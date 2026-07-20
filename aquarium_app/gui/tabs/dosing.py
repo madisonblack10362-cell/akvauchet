@@ -334,7 +334,7 @@ class DosingTab:
             self.refresh_dosing_table()
 
     def _rebuild_dose_fert_grid(self):
-        """Строит сетку строк: каждое удобрение = название + поле дозы."""
+        """Строит сетку 2 колонки: каждое удобрение = название + поле дозы."""
         grid = getattr(self, "_dose_fert_grid", None)
         if grid is None or not grid.winfo_exists():
             return
@@ -344,10 +344,15 @@ class DosingTab:
 
         ferts = get_fertilizers(self.conn)
         FF = self.FF
-        for fert in ferts:
-            row = tk.Frame(grid, bg=COLOR_CARD)
-            row.pack(fill="x", pady=1)
-            # определяем цвет по типу удобрения
+        COLS = 2
+        for i, fert in enumerate(ferts):
+            col = i % COLS
+            if col == 0:
+                row = tk.Frame(grid, bg=COLOR_CARD)
+                row.pack(fill="x", pady=1)
+            cell = tk.Frame(row, bg=COLOR_CARD)
+            cell.pack(side="left", fill="x", expand=True)
+            # цвет по типу
             name = (fert["name"] or "").lower()
             if "микро" in name or "micro" in name:
                 clr = "#8B7D5E"
@@ -359,11 +364,11 @@ class DosingTab:
                         break
             else:
                 clr = "#8B7D5E"
-            tk.Label(row, text=fert["name"] or "Без названия", font=(FF, 9),
-                     bg=COLOR_CARD, fg=clr, width=28, anchor="w").pack(side="left")
-            spin = SpinEntry(row, width=7, step=0.1, font_family=FF)
-            spin.pack(side="left", padx=(4, 2))
-            tk.Label(row, text="мл", font=(FF, 8),
+            tk.Label(cell, text=fert["name"] or "Без названия", font=(FF, 9),
+                     bg=COLOR_CARD, fg=clr, anchor="w").pack(side="left")
+            spin = SpinEntry(cell, width=6, step=0.1, font_family=FF)
+            spin.pack(side="left", padx=(4, 1))
+            tk.Label(cell, text="мл", font=(FF, 8),
                      bg=COLOR_CARD, fg=COLOR_TEXT_MUTED).pack(side="left")
             self._dose_fert_entries[fert["id"]] = (fert, spin)
             spin.var.trace_add("write", lambda *_: self._update_dose_preview())
