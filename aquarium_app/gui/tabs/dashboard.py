@@ -366,7 +366,30 @@ class DashboardTab:
         wc_frame = tk.Frame(card, bg=COLOR_CARD)
         wc_frame.pack(fill="x", pady=(6, 0))
 
-        # собираем все подмены за выбранный период
+        aq = get_aquarium(self.conn, aq_id)
+        vol = aq["volume_l"] if aq else 0
+
+        # --- 1) Абсолютно последняя подмена (без фильтра периода) ---
+        last_wc = self.conn.execute(
+            "SELECT date, water_change_pct, water_change_l FROM readings "
+            "WHERE aquarium_id=? AND (water_change_pct IS NOT NULL OR water_change_l IS NOT NULL) "
+            "ORDER BY date DESC LIMIT 1", (aq_id,)
+        ).fetchone()
+
+        days_since = None
+        last_wc_pct = None
+        if last_wc:
+            try:
+                wc_d = dt.date.fromisoformat(last_wc["date"])
+                days_since = (dt.date.today() - wc_d).days
+                p = last_wc["water_change_pct"]
+                if p is None and last_wc["water_change_l"] and vol:
+                    p = round(last_wc["water_change_l"] / vol * 100, 1)
+                last_wc_pct = p
+            except (ValueError, TypeError):
+                pass
+
+        # --- 2) Подмены за выбранный период (для прогресс-бара) ---
         wc_where = ["aquarium_id=?"]
         wc_params: list = [aq_id]
         if date_from:
@@ -383,9 +406,6 @@ class DashboardTab:
             "ORDER BY date DESC", wc_params
         ).fetchall()
 
-        # суммарный % за период
-        aq = get_aquarium(self.conn, aq_id)
-        vol = aq["volume_l"] if aq else 0
         total_pct = 0.0
         for r in wc_rows:
             pct = r["water_change_pct"]
@@ -395,59 +415,49 @@ class DashboardTab:
                 total_pct += pct
         total_pct = min(total_pct, 100)
 
-        # последняя подмена (для текста и прогноза)
-        last_wc_date = wc_rows[0]["date"] if wc_rows else None
-        last_wc_pct = None
-        if wc_rows:
-            p = wc_rows[0]["water_change_pct"]
-            if p is None and wc_rows[0].get("water_change_l") and vol:
-                p = round(wc_rows[0]["water_change_l"] / vol * 100, 1)
-            last_wc_pct = p
-
-        # рассчитываем дней до следующей подмены от последней
-        days_since = None
-        days_until = None
-        if last_wc_date:
-            try:
-                wc_d = dt.date.fromisoformat(last_wc_date)
-                days_since = (dt.date.today() - wc_d).days
-                if last_wc_pct and last_wc_pct >= 30:
-                    interval = max(4, int(10 - last_wc_pct / 10))
-                else:
-                    interval = 7
-                days_until = max(0, interval - days_since)
-            except (ValueError, TypeError):
-                pass
-
-        # верхняя строка: текст + прогноз
+        # --- 3) Верхняя строка: сколько дней с последней подмены ---
         top_row = tk.Frame(wc_frame, bg=COLOR_CARD)
         top_row.pack(fill="x", padx=4, pady=(4, 2))
 
-        if wc_rows:
-            count_txt = f" ({len(wc_rows)} подм.)" if len(wc_rows) > 1 else ""
-            wc_main = f"Подмена{count_txt} — итого {total_pct:.0f}%"
-            if days_since is not None:
-                if days_since == 0:
-                    wc_main += " (сегодня)"
-                elif days_since == 1:
-                    wc_main += " (вчера)"
-                else:
-                    wc_main += f" ({days_since} дн. назад)"
-            tk.Label(top_row, text=wc_main, font=(FF, 9),
+        if days_since is not None:
+            # текст слева: дней с последней подмены
+            if days_since == 0:
+                since_txt = "Последняя подмена — сегодня"
+            elif days_since == 1:
+                since_txt = "Последняя подмена — вчера"
+            else:
+                since_txt = f"Последняя подмена — {days_since} дн. назад"
+            tk.Label(top_row, text=since_txt, font=(FF, 9),
                      bg=COLOR_CARD, fg=COLOR_TEXT).pack(side="left")
 
-            if days_until is not None:
-                if days_until <= 0:
-                    hint, hclr = "Следующая подмена — пора!", COLOR_WARN_TEXT
-                elif days_until == 1:
-                    hint, hclr = "Следующая подмена — завтра", COLOR_STATUS_WAITING
-                else:
-                    hint, hclr = f"Следующая подмена через {days_until} дн.", COLOR_TEXT_MUTED
-                tk.Label(top_row, text=hint, font=(FF, 10, "bold"),
-                         bg=COLOR_CARD, fg=hclr).pack(side="right")
+            # прогноз справа: следующая подмена
+            if last_wc_pct and last_wc_pct >= 30:
+                interval = max(4, int(10 - last_wc_pct / 10))
+            else:
+                interval = 7
+            days_until = max(0, interval - days_since)
+
+            if days_until <= 0:
+                hint, hclr = "Следующая — пора!", COLOR_WARN_TEXT
+            elif days_until == 1:
+                hint, hclr = "Следующая — завтра", COLOR_STATUS_WAITING
+            else:
+                hint, hclr = f"Следующая через {days_until} дн.", COLOR_TEXT_MUTED
+            tk.Label(top_row, text=hint, font=(FF, 10, "bold"),
+                     bg=COLOR_CARD, fg=hclr).pack(side="right")
         else:
-            tk.Label(top_row, text="Подмен за период нет — пора!", font=(FF, 10, "bold"),
-                     bg=COLOR_CARD, fg=COLOR_WARN_TEXT).pack(side="right")
+            # подмен вообще никогда не было
+            tk.Label(top_row, text="Подмен ещё не было",
+                     font=(FF, 9), bg=COLOR_CARD, fg=COLOR_TEXT_MUTED).pack(side="left")
+
+        # --- 4) Прогресс-бар: суммарный % за выбранный период ---
+        if wc_rows:
+            count_txt = f" ({len(wc_rows)} подм.)" if len(wc_rows) > 1 else ""
+            bar_label = f"За период: {total_pct:.0f}%{count_txt}"
+        else:
+            bar_label = "За период: 0%"
+        tk.Label(wc_frame, text=bar_label, font=(FF, 8),
+                 bg=COLOR_CARD, fg=COLOR_TEXT_MUTED).pack(anchor="w", padx=4, pady=(0, 2))
 
         # прогресс-бар: заливка по суммарному %, цвет воды
         bar_outer = tk.Canvas(wc_frame, bg=COLOR_BORDER, highlightthickness=0, height=8)
