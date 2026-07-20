@@ -16,8 +16,8 @@ from aquarium_app.config import (
 )
 from aquarium_app.db import (
     get_aquariums, get_aquarium,
-    get_dosing, get_dosing_filtered, get_dosing_entry, add_dosing,
-    update_dosing, delete_dosing, get_fertilizers, get_fertilizer, get_targets,
+    get_dosing, get_dosing_filtered, add_dosing,
+    get_fertilizers, get_targets,
 )
 from aquarium_app.logic.calculations import (
     compute_deltas, sum_range_totals,
@@ -156,40 +156,38 @@ class DosingTab:
                                              highlightthickness=0, height=180)
         self.dosing_trend_canvas.pack(fill="x", padx=8, pady=(0, 6))
 
-        # ---- форма добавления с живым превью ----
+        # ---- форма добавления (компактная) ----
         add_frame = tk.LabelFrame(inner, text="  Добавить дозировку  ", font=(FF, 10, "bold"),
                                   bg=COLOR_CARD, fg=COLOR_ACCENT, bd=1, relief="solid")
         add_frame.pack(fill="x", padx=12, pady=4)
 
-        # дата + кнопка добавления в одной строке
-        row_date = tk.Frame(add_frame, bg=COLOR_CARD)
-        row_date.pack(fill="x", padx=8, pady=(6, 4))
-        tk.Label(row_date, text="Дата:", font=(FF, 9), bg=COLOR_CARD,
+        # строка 1: дата + удобрения + кнопка
+        row1 = tk.Frame(add_frame, bg=COLOR_CARD)
+        row1.pack(fill="x", padx=8, pady=(4, 2))
+        tk.Label(row1, text="Дата:", font=(FF, 9), bg=COLOR_CARD,
                  fg=COLOR_TEXT_SOFT).pack(side="left")
-        self.dose_date_entry = DateEntry(row_date, font_family=FF, width=12)
-        self.dose_date_entry.pack(side="left", padx=(2, 0))
-        tk.Button(row_date, text="Добавить", font=(FF, 9, "bold"), relief="flat",
+        self.dose_date_entry = DateEntry(row1, font_family=FF, width=12)
+        self.dose_date_entry.pack(side="left", padx=(2, 8))
+
+        # удобрения — просто Label + SpinEntry рядом
+        self._dose_fert_entries: dict[int, tuple] = {}
+        self._dose_fert_widgets_frame = row1  # чтобы перестраивать
+        self._rebuild_dose_fert_grid()
+
+        tk.Button(row1, text="Добавить", font=(FF, 9, "bold"), relief="flat",
                   bg=COLOR_ACCENT, fg="#151515", activebackground=COLOR_ACCENT_HOVER,
                   activeforeground="#151515", borderwidth=0, padx=12, pady=3,
                   command=self.add_dosing_entries, cursor="hand2").pack(side="right")
 
-        # сетка удобрений: одна строка, все удобрения рядом
-        self._dose_fert_grid = tk.Frame(add_frame, bg=COLOR_CARD)
-        self._dose_fert_grid.pack(fill="x", padx=8, pady=(0, 2))
-        self._dose_fert_entries: dict[int, tuple] = {}  # fert_id -> (fert_row, SpinEntry)
-
-        # живое превью прироста элементов
-        self._dose_preview_frame = tk.Frame(add_frame, bg=COLOR_BG)
-        self._dose_preview_frame.pack(fill="x", padx=8, pady=(0, 2))
-
-        # комментарий
-        row_comm = tk.Frame(add_frame, bg=COLOR_CARD)
-        row_comm.pack(fill="x", padx=8, pady=(2, 6))
-        tk.Label(row_comm, text="Комментарий:", font=(FF, 9), bg=COLOR_CARD,
-                 fg=COLOR_TEXT_SOFT).pack(side="left")
+        # строка 2: превью + комментарий
+        row2 = tk.Frame(add_frame, bg=COLOR_CARD)
+        row2.pack(fill="x", padx=8, pady=(0, 4))
+        self._dose_preview_frame = tk.Frame(row2, bg=COLOR_CARD)
+        self._dose_preview_frame.pack(side="left", fill="x", expand=True)
+        tk.Label(row2, text="Коммент:", font=(FF, 8), bg=COLOR_CARD,
+                 fg=COLOR_TEXT_MUTED).pack(side="left", padx=(8, 2))
         self.dose_comment_var = tk.StringVar()
-        ttk.Entry(row_comm, textvariable=self.dose_comment_var, width=50).pack(
-            side="left", padx=(2, 0), fill="x", expand=True)
+        ttk.Entry(row2, textvariable=self.dose_comment_var, width=20).pack(side="left")
 
         # кнопки над таблицей
         btn_row = tk.Frame(inner, bg=COLOR_BG)
@@ -203,32 +201,12 @@ class DosingTab:
                   borderwidth=0, padx=12, pady=4, command=self.delete_dosing_selected,
                   cursor="hand2").pack(side="left", padx=(8, 0))
 
-        # ---- таблица дозировок ----
+        # ---- таблица дозировок (по датам, как показания) ----
         table_frame = tk.Frame(inner, bg=COLOR_BG)
         table_frame.pack(fill="x", padx=12, pady=(4, 12))
 
-        dose_cols = ("date", "fert", "dose", "comment",
-                     "no3", "po4", "k", "fe", "mg", "ca")
-        self.dose_tree = ttk.Treeview(table_frame, columns=dose_cols, show="headings",
-                                       height=8, selectmode="browse")
-        self.dose_tree.heading("date", text="Дата")
-        self.dose_tree.heading("fert", text="Удобрение")
-        self.dose_tree.heading("dose", text="Доза")
-        self.dose_tree.heading("comment", text="Комментарий")
-        self.dose_tree.heading("no3", text="NO3")
-        self.dose_tree.heading("po4", text="PO4")
-        self.dose_tree.heading("k", text="K")
-        self.dose_tree.heading("fe", text="Fe")
-        self.dose_tree.heading("mg", text="Mg")
-        self.dose_tree.heading("ca", text="Ca")
-
-        self.dose_tree.column("date", width=90, minwidth=80)
-        self.dose_tree.column("fert", width=160, minwidth=100)
-        self.dose_tree.column("dose", width=60, minwidth=50, anchor="center")
-        self.dose_tree.column("comment", width=140, minwidth=80)
-        for ek in ("no3", "po4", "k", "fe", "mg", "ca"):
-            self.dose_tree.column(ek, width=55, minwidth=45, anchor="center")
-
+        self.dose_tree = ttk.Treeview(table_frame, show="headings",
+                                       height=10, selectmode="browse")
         vsb = ttk.Scrollbar(table_frame, orient="vertical", command=self.dose_tree.yview)
         hsb = ttk.Scrollbar(table_frame, orient="horizontal", command=self.dose_tree.xview)
         self.dose_tree.configure(yscrollcommand=vsb.set, xscrollcommand=hsb.set)
@@ -237,6 +215,7 @@ class DosingTab:
         hsb.grid(row=1, column=0, sticky="ew")
         table_frame.grid_rowconfigure(0, weight=1)
         table_frame.grid_columnconfigure(0, weight=1)
+        self._dose_table_built = False
 
         # инициализация
         self._fert_map = {}
@@ -371,47 +350,27 @@ class DosingTab:
         if c and c.winfo_exists():
             c.yview_scroll(int(-1 * (event.delta / 120)), "units")
 
-    def _dose_grid_wheel(self, event):
-        canvas = getattr(self, "_dose_fert_canvas", None)
-        if canvas and canvas.winfo_exists():
-            canvas.xview_scroll(int(-1 * (event.delta / 120)), "units")
-
     def _rebuild_dose_fert_grid(self):
-        """Одна строка: все удобрения рядом, по центру. Микро → 'Микро'."""
-        grid = getattr(self, "_dose_fert_grid", None)
-        if grid is None or not grid.winfo_exists():
+        """Строит виджеты удобрений прямо в строке row1: Название [мл]."""
+        frame = getattr(self, "_dose_fert_widgets_frame", None)
+        if frame is None or not frame.winfo_exists():
             return
-        for w in grid.winfo_children():
-            w.destroy()
+        # удаляем старые виджеты удобрений (не трогаем Дата и Добавить)
+        for w in list(frame.winfo_children()):
+            if isinstance(w, tk.Frame) and w not in (
+                self.dose_date_entry.master,  # row_date parent
+            ):
+                try:
+                    w.destroy()
+                except Exception:
+                    pass
         self._dose_fert_entries = {}
 
         ferts = get_fertilizers(self.conn)
         if not ferts:
             return
         FF = self.FF
-
-        # Canvas для скрытого горизонтального скролла колёсиком
-        canvas = tk.Canvas(grid, bg=COLOR_CARD, highlightthickness=0, height=28)
-        canvas.pack(fill="x")
-        self._dose_fert_canvas = canvas
-
-        inner = tk.Frame(canvas, bg=COLOR_CARD)
-        self._dose_fert_inner = inner
-        canvas.create_window((0, 0), window=inner, anchor="nw", tags="inner_win")
-
-        def _on_configure(e):
-            canvas.configure(scrollregion=canvas.bbox("all"))
-            iw = inner.winfo_reqwidth()
-            # центрируем если влезает, иначе прижимаем влево
-            x = max(0, (e.width - iw) // 2) if iw <= e.width else 0
-            canvas.coords("inner_win", x, 0)
-            canvas.itemconfig("inner_win", width=iw)
-
-        canvas.bind("<Configure>", _on_configure)
-
         for fert in ferts:
-            cell = tk.Frame(inner, bg=COLOR_CARD)
-            cell.pack(side="left", padx=6)
             name = (fert["name"] or "").lower()
             is_micro = "микро" in name or "micro" in name
             if is_micro:
@@ -424,25 +383,18 @@ class DosingTab:
                         break
             else:
                 clr = "#8B7D5E"
-            display_name = "Микро" if is_micro else (fert["name"] or "Без названия")
-            tk.Label(cell, text=display_name, font=(FF, 9),
-                     bg=COLOR_CARD, fg=clr).pack(side="left")
+            display = "Микро" if is_micro else (fert["name"] or "?")
+            cell = tk.Frame(frame, bg=COLOR_CARD)
+            cell.pack(side="left", padx=(0, 6))
+            tk.Label(cell, text=display, font=(FF, 9), bg=COLOR_CARD,
+                     fg=clr).pack(side="left")
             spin = SpinEntry(cell, width=5, step=0.1, font_family=FF)
-            spin.pack(side="left", padx=(3, 1))
-            tk.Label(cell, text="мл", font=(FF, 8),
-                     bg=COLOR_CARD, fg=COLOR_TEXT_MUTED).pack(side="left")
+            spin.pack(side="left", padx=(2, 0))
             self._dose_fert_entries[fert["id"]] = (fert, spin)
             spin.var.trace_add("write", lambda *_: self._update_dose_preview())
 
-        # колёсико → горизонтальный скролл сетки (переопределяет вертикальный вкладки)
-        canvas.bind("<Enter>", lambda e: (
-            canvas.bind_all("<MouseWheel>", self._dose_grid_wheel)))
-        canvas.bind("<Leave>", lambda e: (
-            canvas.unbind_all("<MouseWheel>"),
-            canvas.bind_all("<MouseWheel>", self._dose_tab_wheel)))
-
     # ------------------------------------------------------------------
-    # Обновление таблицы дозировок
+    # Обновление таблицы дозировок (по датам, как показания)
     # ------------------------------------------------------------------
 
     def refresh_dosing_table(self):
@@ -468,29 +420,49 @@ class DosingTab:
         rows = get_dosing_filtered(self.conn, aq_id,
                                     date_from=date_from, date_to=date_to)
 
+        ferts = get_fertilizers(self.conn)
+        self._dose_table_ferts = ferts
+
         tree = self.dose_tree
         if not tree.winfo_exists():
             return
-        tree.delete(*tree.get_children())
 
-        volume = aq["volume_l"] or 0
+        # динамические колонки: Дата | [каждое удобрение] | Комментарий
+        fert_cols = [f"f_{f['id']}" for f in ferts]
+        all_cols = ("date",) + tuple(fert_cols) + ("comment",)
+        tree["columns"] = all_cols
+        tree.heading("date", text="Дата")
+        tree.column("date", width=90, minwidth=80)
+        for fert, col in zip(ferts, fert_cols):
+            nm = fert["name"] or ""
+            if "микро" in nm.lower() or "micro" in nm.lower():
+                nm = "Микро"
+            tree.heading(col, text=nm)
+            tree.column(col, width=70, minwidth=50, anchor="center")
+        tree.heading("comment", text="Комментарий")
+        tree.column("comment", width=140, minwidth=80)
 
+        # группируем по дате
+        by_date: dict[str, dict] = {}
         for r in rows:
-            delta = compute_deltas(r, r["dose"], volume)
-            comment = r["comment"] or ""
-            vals = (
-                from_iso(r["date"]),
-                r["fert_name"] or "",
-                f"{r['dose']:g}",
-                comment,
-                f"{delta['no3']:.1f}" if delta["no3"] else "",
-                f"{delta['po4']:.1f}" if delta["po4"] else "",
-                f"{delta['k']:.1f}" if delta["k"] else "",
-                f"{delta['fe']:.4f}" if delta["fe"] else "",
-                f"{delta['mg']:.3f}" if delta["mg"] else "",
-                f"{delta['ca']:.3f}" if delta["ca"] else "",
-            )
-            tree.insert("", "end", iid=str(r["id"]), values=vals)
+            d = r["date"]
+            if d not in by_date:
+                by_date[d] = {}
+            by_date[d][r["fert_id"]] = r
+
+        tree.delete(*tree.get_children())
+        for date_iso in sorted(by_date.keys(), reverse=True):
+            day = by_date[date_iso]
+            vals = [from_iso(date_iso)]
+            for fert in ferts:
+                r = day.get(fert["id"])
+                vals.append(f"{r['dose']:g}" if r else "")
+            comment = ""
+            if day:
+                first = next(iter(day.values()))
+                comment = first["comment"] or ""
+            vals.append(comment)
+            tree.insert("", "end", iid=date_iso, values=vals)
 
         # обновляем сводную полосу
         totals = sum_range_totals(self.conn, aq_id,
@@ -502,16 +474,13 @@ class DosingTab:
             period_parts.append(f"по {from_iso(date_to)}")
         period_str = " ".join(period_parts) if period_parts else "за всё время"
         self._build_summary_strip(totals, period_str)
-
-        # обновляем тренд
         self.refresh_dosing_trend()
 
     # ------------------------------------------------------------------
-    # Добавление записи дозировки
+    # Добавление (upsert — если за дату уже есть, обновляет)
     # ------------------------------------------------------------------
 
     def add_dosing_entries(self):
-        """Сохраняет все ненулевые дозы из сетки удобрений за указанную дату."""
         aq_name = self.dose_aq_combo.get()
         if not aq_name:
             messagebox.showwarning("Внимание", "Выберите аквариум.")
@@ -519,8 +488,7 @@ class DosingTab:
         date_str = self.dose_date_entry.get().strip()
         date_iso = to_iso(date_str)
         if not date_iso:
-            messagebox.showwarning("Внимание",
-                                   "Неверный формат даты. Используйте ДД.ММ.ГГГГ.")
+            messagebox.showwarning("Внимание", "Неверный формат даты.")
             return
         aq_id = getattr(self, "_dosing_aq_id", None)
         if aq_id is None:
@@ -536,139 +504,172 @@ class DosingTab:
         for fert_id, (fert, spin) in self._dose_fert_entries.items():
             dose = parse_float(spin.get().strip(), 0) or 0
             if dose > 0:
-                add_dosing(self.conn, aq_id, date_iso, fert_id, dose, comment)
+                # upsert: если запись за эту дату+удобрение есть — обновляем
+                existing = self.conn.execute(
+                    "SELECT id FROM dosing WHERE aquarium_id=? AND date=? AND fert_id=?",
+                    (aq_id, date_iso, fert_id)).fetchone()
+                if existing:
+                    self.conn.execute(
+                        "UPDATE dosing SET dose=?, comment=? WHERE id=?",
+                        (dose, comment, existing["id"]))
+                else:
+                    add_dosing(self.conn, aq_id, date_iso, fert_id, dose, comment)
                 added += 1
-
         if added == 0:
             messagebox.showwarning("Внимание", "Укажите хотя бы одну дозу.")
             return
-
-        # очищаем поля доз после добавления
-        for fert_id, (fert, spin) in self._dose_fert_entries.items():
+        self.conn.commit()
+        for _, (_, spin) in self._dose_fert_entries.items():
             spin.var.set("")
         self.dose_comment_var.set("")
         self._update_dose_preview()
         self.refresh_dosing_table()
 
     # ------------------------------------------------------------------
-    # Редактирование записи дозировки
+    # Редактирование (все дозы за дату)
     # ------------------------------------------------------------------
 
     def edit_dosing_entry(self):
         sel = self.dose_tree.selection()
         if not sel:
             return
-        dosing_id = int(sel[0])
-        entry = get_dosing_entry(self.conn, dosing_id)
-        if not entry:
+        date_iso = sel[0]
+        aq_id = getattr(self, "_dosing_aq_id", None)
+        if not aq_id:
             return
-        data = self._dosing_form_dialog("Редактировать дозировку", entry=entry)
-        if data is not None:
-            update_dosing(self.conn, dosing_id, **data)
+        # собираем текущие дозы за эту дату
+        rows = self.conn.execute(
+            "SELECT d.*, f.name AS fert_name FROM dosing d "
+            "JOIN fertilizers f ON d.fert_id = f.id "
+            "WHERE d.aquarium_id=? AND d.date=?", (aq_id, date_iso)).fetchall()
+        current = {r["fert_id"]: r for r in rows}
+        comment = rows[0]["comment"] if rows else ""
+
+        result = self._dosing_date_dialog("Редактировать дозировку",
+                                          date_iso, current, comment)
+        if result is not None:
+            doses, new_comment = result
+            # удаляем все старые записи за эту дату
+            self.conn.execute(
+                "DELETE FROM dosing WHERE aquarium_id=? AND date=?",
+                (aq_id, date_iso))
+            # вставляем новые
+            for fid, dose in doses.items():
+                if dose > 0:
+                    add_dosing(self.conn, aq_id, date_iso, fid, dose, new_comment)
+            self.conn.commit()
             self.refresh_dosing_table()
 
     # ------------------------------------------------------------------
-    # Удаление записи дозировки
+    # Удаление (все дозы за дату)
     # ------------------------------------------------------------------
 
     def delete_dosing_selected(self):
         sel = self.dose_tree.selection()
         if not sel:
             return
-        dosing_id = int(sel[0])
-        if not messagebox.askyesno("Удаление", "Удалить выбранную запись дозировки?",
-                                    parent=self.root if hasattr(self, "root") else self):
+        date_iso = sel[0]
+        aq_id = getattr(self, "_dosing_aq_id", None)
+        if not aq_id:
             return
-        delete_dosing(self.conn, dosing_id)
+        if not messagebox.askyesno("Удаление",
+                                    f"Удалить все дозировки за {from_iso(date_iso)}?",
+                                    parent=self):
+            return
+        self.conn.execute(
+            "DELETE FROM dosing WHERE aquarium_id=? AND date=?",
+            (aq_id, date_iso))
+        self.conn.commit()
         self.refresh_dosing_table()
 
     # ------------------------------------------------------------------
-    # Диалог формы дозировки (редактирование)
+    # Диалог редактирования всех доз за дату
     # ------------------------------------------------------------------
 
-    def _dosing_form_dialog(self, title, entry=None):
+    def _dosing_date_dialog(self, title, date_iso, current_doses, current_comment):
+        """Диалог с датой + все удобрения с текущими дозами. Возвращает (dict, comment) или None."""
         FF = self.FF
-        parent = self.root if hasattr(self, "root") else self
+        ferts = get_fertilizers(self.conn)
 
-        dlg = tk.Toplevel(parent)
+        dlg = tk.Toplevel(self)
         dlg.title(title)
         dlg.configure(bg=COLOR_BG)
-        dlg.transient(parent)
+        dlg.transient(self)
         dlg.grab_set()
         dlg.resizable(False, False)
 
-        inner = tk.Frame(dlg, bg=COLOR_CARD, padx=16, pady=12)
-        inner.pack(padx=16, pady=16)
+        body = tk.Frame(dlg, bg=COLOR_CARD, padx=16, pady=12)
+        body.pack(padx=16, pady=16)
 
         # дата
-        row_date = tk.Frame(inner, bg=COLOR_CARD)
-        row_date.pack(fill="x", pady=4)
-        tk.Label(row_date, text="Дата:", width=14, anchor="w",
-                 bg=COLOR_CARD, fg=COLOR_TEXT, font=(FF, 10)).pack(side="left")
-        date_entry = DateEntry(row_date, font_family=FF, width=12,
-                               default=from_iso(entry["date"]) if entry else None)
+        row_d = tk.Frame(body, bg=COLOR_CARD)
+        row_d.pack(fill="x", pady=4)
+        tk.Label(row_d, text="Дата:", width=14, anchor="w", bg=COLOR_CARD,
+                 fg=COLOR_TEXT, font=(FF, 10)).pack(side="left")
+        date_entry = DateEntry(row_d, font_family=FF, width=12,
+                               default=from_iso(date_iso))
         date_entry.pack(side="left")
 
-        # удобрение
-        row_fert = tk.Frame(inner, bg=COLOR_CARD)
-        row_fert.pack(fill="x", pady=4)
-        tk.Label(row_fert, text="Удобрение:", width=14, anchor="w",
-                 bg=COLOR_CARD, fg=COLOR_TEXT, font=(FF, 10)).pack(side="left")
-        ferts = get_fertilizers(self.conn)
-        fert_names = [f["name"] for f in ferts]
-        fert_name_var = tk.StringVar(value=entry["fert_name"] if entry else "")
-        fert_combo = ttk.Combobox(row_fert, textvariable=fert_name_var,
-                                   values=fert_names, state="readonly", width=36)
-        fert_combo.pack(side="left")
-
-        # доза
-        row_dose = tk.Frame(inner, bg=COLOR_CARD)
-        row_dose.pack(fill="x", pady=4)
-        tk.Label(row_dose, text="Доза (мл):", width=14, anchor="w",
-                 bg=COLOR_CARD, fg=COLOR_TEXT, font=(FF, 10)).pack(side="left")
-        dose_spin = SpinEntry(row_dose, width=10, step=0.1, font_family=FF,
-                               default=f"{entry['dose']:g}" if entry else "1.0")
-        dose_spin.pack(side="left")
+        # удобрения
+        fert_spins = {}
+        for fert in ferts:
+            row = tk.Frame(body, bg=COLOR_CARD)
+            row.pack(fill="x", pady=2)
+            fid = fert["id"]
+            nm = fert["name"] or ""
+            is_micro = "микро" in nm.lower() or "micro" in nm.lower()
+            if is_micro:
+                clr = "#8B7D5E"
+                display = "Микро"
+            elif any(fert.get(ek) for ek in ("no3", "po4", "k", "mg", "ca")):
+                clr = COLOR_ACCENT
+                display = nm
+                for ek in ("po4", "no3", "k", "mg", "ca"):
+                    if fert.get(ek):
+                        clr = ELEMENT_COLORS.get(ek, COLOR_ACCENT)
+                        break
+            else:
+                clr = "#8B7D5E"
+                display = nm
+            tk.Label(row, text=display, width=14, anchor="w", bg=COLOR_CARD,
+                     fg=clr, font=(FF, 10)).pack(side="left")
+            existing = current_doses.get(fid)
+            default_val = f"{existing['dose']:g}" if existing else ""
+            spin = SpinEntry(row, width=8, step=0.1, font_family=FF,
+                              default=default_val)
+            spin.pack(side="left")
+            tk.Label(row, text="мл", bg=COLOR_CARD, fg=COLOR_TEXT_MUTED,
+                     font=(FF, 9)).pack(side="left", padx=(2, 0))
+            fert_spins[fid] = spin
 
         # комментарий
-        row_comm = tk.Frame(inner, bg=COLOR_CARD)
-        row_comm.pack(fill="x", pady=4)
-        tk.Label(row_comm, text="Комментарий:", width=14, anchor="w",
-                 bg=COLOR_CARD, fg=COLOR_TEXT, font=(FF, 10)).pack(side="left")
-        comm_var = tk.StringVar(value=(entry["comment"] or "") if entry else "")
-        ttk.Entry(row_comm, textvariable=comm_var, width=40).pack(
+        row_c = tk.Frame(body, bg=COLOR_CARD)
+        row_c.pack(fill="x", pady=(6, 4))
+        tk.Label(row_c, text="Комментарий:", width=14, anchor="w", bg=COLOR_CARD,
+                 fg=COLOR_TEXT, font=(FF, 10)).pack(side="left")
+        comm_var = tk.StringVar(value=current_comment or "")
+        ttk.Entry(row_c, textvariable=comm_var, width=40).pack(
             side="left", fill="x", expand=True)
 
         # кнопки
-        btn_row = tk.Frame(inner, bg=COLOR_CARD)
+        btn_row = tk.Frame(body, bg=COLOR_CARD)
         btn_row.pack(fill="x", pady=(10, 0))
-
         result = [None]
 
         def _save():
-            date_iso = to_iso(date_entry.get().strip())
-            if not date_iso:
+            d_iso = to_iso(date_entry.get().strip())
+            if not d_iso:
                 messagebox.showwarning("Внимание", "Неверный формат даты.", parent=dlg)
                 return
-            fn = fert_name_var.get()
-            fid = None
-            for f in ferts:
-                if f["name"] == fn:
-                    fid = f["id"]
-                    break
-            if fid is None:
-                messagebox.showwarning("Внимание", "Выберите удобрение.", parent=dlg)
+            doses = {}
+            for fid, spin in fert_spins.items():
+                v = parse_float(spin.get().strip(), 0) or 0
+                if v > 0:
+                    doses[fid] = v
+            if not doses:
+                messagebox.showwarning("Внимание", "Укажите хотя бы одну дозу.", parent=dlg)
                 return
-            dose = parse_float(dose_spin.get(), None)
-            if dose is None or dose <= 0:
-                messagebox.showwarning("Внимание", "Укажите дозу.", parent=dlg)
-                return
-            result[0] = {
-                "date": date_iso,
-                "fert_id": fid,
-                "dose": dose,
-                "comment": comm_var.get().strip(),
-            }
+            result[0] = (doses, comm_var.get().strip(), d_iso)
             dlg.destroy()
 
         def _cancel():
@@ -684,15 +685,15 @@ class DosingTab:
                   command=_save, cursor="hand2").pack(side="right")
 
         dlg.update_idletasks()
-        pw = dlg.master.winfo_width()
-        ph = dlg.master.winfo_height()
-        px = dlg.master.winfo_rootx()
-        py = dlg.master.winfo_rooty()
-        dw = dlg.winfo_width()
-        dh = dlg.winfo_height()
+        pw, ph = dlg.master.winfo_width(), dlg.master.winfo_height()
+        px, py = dlg.master.winfo_rootx(), dlg.master.winfo_rooty()
+        dw, dh = dlg.winfo_width(), dlg.winfo_height()
         dlg.geometry(f"+{px + (pw - dw) // 2}+{py + (ph - dh) // 2}")
         dlg.wait_window()
-        return result[0]
+        if result[0] is None:
+            return None
+        doses, comment, new_date = result[0]
+        return (doses, comment)
 
     # ------------------------------------------------------------------
     # Обратный калькулятор дозы
