@@ -388,7 +388,7 @@ class JournalTab:
 
                 pill = tk.Frame(params_row, bg=bg_pill, padx=4, pady=1)
                 pill.pack(side="left", padx=(0, 4), pady=1)
-                lbl = tk.Label(pill, text=f"{formula}: +{v:g} {unit}".strip(),
+                lbl = tk.Label(pill, text=f"{formula}: {v:g} {unit}".strip(),
                                bg=bg_pill, fg=fg, font=(FF, 9, "bold"))
                 lbl.pack()
 
@@ -417,8 +417,8 @@ class JournalTab:
                 row.pack(fill="x", padx=6, pady=1)
                 tk.Label(row, text=f"{fert_name}", bg=COLOR_BG,
                          fg=COLOR_TEXT, font=(FF, 9)).pack(side="left")
-                tk.Label(row, text=f"{dose:g} мл", bg=COLOR_BG,
-                         fg=COLOR_ACCENT, font=(FF, 9, "bold")).pack(side="left", padx=(6, 0))
+                tk.Label(row, text=f"+{dose:g} мл", bg=COLOR_BG,
+                         fg=COLOR_OK_TEXT, font=(FF, 9, "bold")).pack(side="left", padx=(6, 0))
                 if comment:
                     tk.Label(row, text=f"  {comment}", bg=COLOR_BG,
                              fg=COLOR_TEXT_MUTED, font=(FF, 8, "italic")).pack(side="left")
