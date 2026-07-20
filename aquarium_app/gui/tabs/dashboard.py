@@ -430,20 +430,29 @@ class DashboardTab:
             tk.Label(top_row, text=since_txt, font=(FF, 9),
                      bg=COLOR_CARD, fg=COLOR_TEXT).pack(side="left")
 
-            # прогноз справа: следующая подмена
-            if last_wc_pct and last_wc_pct >= 30:
-                interval = max(4, int(10 - last_wc_pct / 10))
+            # прогресс справа: сколько % за текущую неделю к цели 30%
+            today = dt.date.today()
+            monday = today - dt.timedelta(days=today.weekday())
+            week_rows = self.conn.execute(
+                "SELECT water_change_pct, water_change_l FROM readings "
+                "WHERE aquarium_id=? AND date>=? AND date<=? "
+                "AND (water_change_pct IS NOT NULL OR water_change_l IS NOT NULL)",
+                (aq_id, monday.isoformat(), today.isoformat())
+            ).fetchall()
+            week_pct = 0.0
+            for wr in week_rows:
+                wp = wr["water_change_pct"]
+                if wp is None and wr["water_change_l"] and vol:
+                    wp = round(wr["water_change_l"] / vol * 100, 1)
+                if wp:
+                    week_pct += wp
+            week_goal = 30
+            remaining = round(week_goal - week_pct, 1)
+            if remaining <= 0:
+                hint, hclr = f"Цель {week_goal}% за неделю выполнена", COLOR_OK_TEXT
             else:
-                interval = 7
-            days_until = max(0, interval - days_since)
-
-            if days_until <= 0:
-                hint, hclr = "Следующая — пора!", COLOR_WARN_TEXT
-            elif days_until == 1:
-                hint, hclr = "Следующая — завтра", COLOR_STATUS_WAITING
-            else:
-                hint, hclr = f"Следующая через {days_until} дн.", COLOR_TEXT_MUTED
-            tk.Label(top_row, text=hint, font=(FF, 10, "bold"),
+                hint, hclr = f"Осталось подменить {remaining:g}% до {week_goal}%", COLOR_STATUS_WAITING
+            tk.Label(top_row, text=hint, font=(FF, 9, "bold"),
                      bg=COLOR_CARD, fg=hclr).pack(side="right")
         else:
             # подмен вообще никогда не было
