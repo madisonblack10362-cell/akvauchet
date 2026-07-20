@@ -459,7 +459,7 @@ class DashboardTab:
                 tk.Label(hint_frame, text="Осталось подменить ",
                          font=(FF, 9, "bold"), bg=COLOR_CARD, fg=COLOR_STATUS_WAITING).pack(side="left")
                 tk.Label(hint_frame, text=f"{remaining:g}%",
-                         font=(FF, 9, "bold"), bg=COLOR_CARD, fg=COLOR_ACCENT).pack(side="left")
+                         font=(FF, 9, "bold"), bg=COLOR_CARD, fg=COLOR_OK_TEXT).pack(side="left")
                 tk.Label(hint_frame, text=f" до {week_goal:g}%",
                          font=(FF, 9, "bold"), bg=COLOR_CARD, fg=COLOR_STATUS_WAITING).pack(side="left")
         else:
