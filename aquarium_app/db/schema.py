@@ -93,6 +93,12 @@ def init_db(conn: sqlite3.Connection) -> None:
         cur.execute("ALTER TABLE readings ADD COLUMN water_change_l REAL")
     conn.commit()
 
+    # миграция: wc_week_goal — целевая подмена % в неделю для аквариума
+    aq_cols = {row["name"] for row in cur.execute("PRAGMA table_info(aquariums)").fetchall()}
+    if "wc_week_goal" not in aq_cols:
+        cur.execute("ALTER TABLE aquariums ADD COLUMN wc_week_goal REAL DEFAULT 30")
+        conn.commit()
+
     cur.execute("SELECT COUNT(*) AS c FROM aquariums")
     if cur.fetchone()["c"] == 0:
         seed_defaults(conn)

@@ -148,6 +148,10 @@ class AquariumsTab:
                                     default=aq["light"] if aq else "")
         light_entry.pack(fill="x", **pad)
 
+        wc_goal_entry = LabeledEntry(dlg, "Подмена % в неделю:", width=30,
+                                     default=str(int(aq["wc_week_goal"])) if aq and aq.get("wc_week_goal") else "30")
+        wc_goal_entry.pack(fill="x", **pad)
+
         # --- целевые диапазоны ---
         ttk.Separator(dlg).pack(fill="x", padx=12, pady=8)
         tk.Label(dlg, text="Целевые диапазоны параметров", font=(FF, 11, "bold"),
@@ -198,17 +202,21 @@ class AquariumsTab:
                 return
             co2 = co2_entry.get().strip() or None
             light = light_entry.get().strip() or None
+            try:
+                wc_goal = float(wc_goal_entry.get().strip())
+            except (ValueError, AttributeError):
+                wc_goal = 30
 
             if is_new:
                 from aquarium_app.db import add_aquarium as db_add
                 # add_aquarium not in db/__init__.py — use raw SQL
                 cur = self.conn.execute(
-                    "INSERT INTO aquariums (name, volume_l, co2, light) VALUES (?,?,?,?)",
-                    (name, volume, co2, light))
+                    "INSERT INTO aquariums (name, volume_l, co2, light, wc_week_goal) VALUES (?,?,?,?,?)",
+                    (name, volume, co2, light, wc_goal))
                 self.conn.commit()
                 aq_id_new = cur.lastrowid
             else:
-                update_aquarium(self.conn, aq_id, name, volume, co2, light)
+                update_aquarium(self.conn, aq_id, name, volume, co2, light, wc_goal)
                 aq_id_new = aq_id
 
             # сохраняем целевые диапазоны

@@ -430,7 +430,7 @@ class DashboardTab:
             tk.Label(top_row, text=since_txt, font=(FF, 9),
                      bg=COLOR_CARD, fg=COLOR_TEXT).pack(side="left")
 
-            # прогресс справа: сколько % за текущую неделю к цели 30%
+            # прогресс справа: сколько % за текущую неделю к цели из настроек аквариума
             today = dt.date.today()
             monday = today - dt.timedelta(days=today.weekday())
             week_rows = self.conn.execute(
@@ -446,14 +446,22 @@ class DashboardTab:
                     wp = round(wr["water_change_l"] / vol * 100, 1)
                 if wp:
                     week_pct += wp
-            week_goal = 30
+            week_goal = aq.get("wc_week_goal") or 30
             remaining = round(week_goal - week_pct, 1)
             if remaining <= 0:
-                hint, hclr = f"Цель {week_goal}% за неделю выполнена", COLOR_OK_TEXT
+                hint_frame = tk.Frame(top_row, bg=COLOR_CARD)
+                hint_frame.pack(side="right")
+                tk.Label(hint_frame, text=f"Цель {week_goal:g}% за неделю выполнена",
+                         font=(FF, 9, "bold"), bg=COLOR_CARD, fg=COLOR_OK_TEXT).pack(side="left")
             else:
-                hint, hclr = f"Осталось подменить {remaining:g}% до {week_goal}%", COLOR_STATUS_WAITING
-            tk.Label(top_row, text=hint, font=(FF, 9, "bold"),
-                     bg=COLOR_CARD, fg=hclr).pack(side="right")
+                hint_frame = tk.Frame(top_row, bg=COLOR_CARD)
+                hint_frame.pack(side="right")
+                tk.Label(hint_frame, text="Осталось подменить ",
+                         font=(FF, 9, "bold"), bg=COLOR_CARD, fg=COLOR_STATUS_WAITING).pack(side="left")
+                tk.Label(hint_frame, text=f"{remaining:g}%",
+                         font=(FF, 9, "bold"), bg=COLOR_CARD, fg=COLOR_ACCENT).pack(side="left")
+                tk.Label(hint_frame, text=f" до {week_goal:g}%",
+                         font=(FF, 9, "bold"), bg=COLOR_CARD, fg=COLOR_STATUS_WAITING).pack(side="left")
         else:
             # подмен вообще никогда не было
             tk.Label(top_row, text="Подмен ещё не было",
