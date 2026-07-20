@@ -228,20 +228,8 @@ class FertilizersTab:
     # ------------------------------------------------------------------
 
     def _refresh_fert_dropdown(self):
-        combo = getattr(self, "dose_fert_combo", None)
-        if combo is None or not combo.winfo_exists():
-            return
-        ferts = get_fertilizers(self.conn)
-        names = []
-        self._fert_map = {}
-        for f in ferts:
-            name = f["name"] or ""
-            names.append(name)
-            self._fert_map[name] = f["id"]
-        combo["values"] = names
-        cur = combo.get()
-        if cur and cur not in names:
-            combo.set("")
+        """Обновляет сетку удобрений на вкладке дозирования после изменений."""
+        self._rebuild_dose_fert_grid()
 
     # ------------------------------------------------------------------
     # Добавление
