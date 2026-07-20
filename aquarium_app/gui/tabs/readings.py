@@ -9,6 +9,7 @@ from tkinter import ttk, messagebox, filedialog
 from aquarium_app.config import (
     COLOR_BG, COLOR_CARD, COLOR_ACCENT, COLOR_BORDER, COLOR_TEXT,
     COLOR_TEXT_MUTED, COLOR_OK_BG, COLOR_OK_ROW, COLOR_WARN, COLOR_ALT_ROW, COLOR_WARN_TEXT,
+    COLOR_ACCENT_HOVER,
     MEASURED_PARAMS, SPIN_SETTINGS, MEASURED_PARAM_KEYS, FONT_FAMILY,
     ELEMENT_COLORS,
 )
@@ -87,74 +88,55 @@ class ReadingsTab:
                                                height=160, highlightthickness=0)
         self.readings_trend_canvas.pack(fill="x", padx=2, pady=2)
 
-        # --- форма добавления ---
-        form_card = tk.Frame(parent, bg=COLOR_CARD, bd=1, relief="solid",
-                             highlightbackground=COLOR_BORDER, highlightthickness=1)
+        # --- форма добавления (одна строка) ---
+        form_card = tk.LabelFrame(parent, text="  Добавить показание  ", font=(FF, 10, "bold"),
+                                  bg=COLOR_CARD, fg=COLOR_ACCENT, bd=1, relief="solid")
         form_card.pack(fill="x", padx=12, pady=4)
 
-        form_inner = tk.Frame(form_card, bg=COLOR_CARD)
-        form_inner.pack(fill="x", padx=8, pady=6)
+        row = tk.Frame(form_card, bg=COLOR_CARD)
+        row.pack(fill="x", padx=8, pady=4)
 
         # дата
-        row_date = tk.Frame(form_inner, bg=COLOR_CARD)
-        row_date.pack(fill="x", pady=2)
-        ttk.Label(row_date, text="Дата:", width=16, anchor="w",
-                  background=COLOR_CARD).pack(side="left")
-        self.read_date_entry = DateEntry(row_date, font_family=FF, width=12)
-        self.read_date_entry.pack(side="left")
+        ttk.Label(row, text="Дата:", background=COLOR_CARD).pack(side="left")
+        self.read_date_entry = DateEntry(row, font_family=FF, width=12)
+        self.read_date_entry.pack(side="left", padx=(2, 8))
 
-        # строка параметров
-        row_params = tk.Frame(form_inner, bg=COLOR_CARD)
-        row_params.pack(fill="x", pady=2)
-        ttk.Label(row_params, text="Параметры:", width=16, anchor="w",
-                  background=COLOR_CARD).pack(side="left")
-
+        # параметры
         self.read_spin_vars = {}
         self.read_spin_entries = {}
         for key, formula, unit in MEASURED_PARAMS:
-            cell = tk.Frame(row_params, bg=COLOR_CARD)
-            cell.pack(side="left", padx=(0, 12))
+            cell = tk.Frame(row, bg=COLOR_CARD)
+            cell.pack(side="left", padx=(0, 4))
             cfg = SPIN_SETTINGS.get(key, {"step": 0.1, "default": ""})
-            se = SpinEntry(cell, width=7, step=cfg["step"],
+            se = SpinEntry(cell, width=5, step=cfg["step"],
                            default=cfg.get("default", ""))
             se.pack(side="left")
-            lbl_text = f"{formula} {unit}".strip()
+            lbl_text = formula
             tk.Label(cell, text=lbl_text, bg=COLOR_CARD, fg=COLOR_TEXT_MUTED,
-                     font=(FF, 9)).pack(side="left", padx=(6, 0))
+                     font=(FF, 9)).pack(side="left", padx=(2, 0))
             self.read_spin_vars[key] = se.var
             self.read_spin_entries[key] = se
 
         # подмена воды
-        row_wc = tk.Frame(form_inner, bg=COLOR_CARD)
-        row_wc.pack(fill="x", pady=2)
-        ttk.Label(row_wc, text="Подмена воды:", width=16, anchor="w",
-                  background=COLOR_CARD).pack(side="left")
-        self.read_wc_spin = SpinEntry(row_wc, width=6, step=5, default="")
-        self.read_wc_spin.pack(side="left")
+        self.read_wc_spin = SpinEntry(row, width=5, step=5, default="")
+        self.read_wc_spin.pack(side="left", padx=(8, 0))
         self.read_wc_spin.entry.bind("<KeyRelease>", lambda e: self._update_read_wc_pct())
         self.read_wc_l_var = self.read_wc_spin.var
-        ttk.Label(row_wc, text="л", background=COLOR_CARD, foreground=COLOR_TEXT_MUTED).pack(
-            side="left", padx=(4, 10))
-        self.read_wc_pct_label = tk.Label(row_wc, text="= —%", bg=COLOR_CARD,
+        ttk.Label(row, text="л", background=COLOR_CARD, foreground=COLOR_TEXT_MUTED).pack(
+            side="left", padx=(2, 0))
+        self.read_wc_pct_label = tk.Label(row, text="—%", bg=COLOR_CARD,
                                           fg=COLOR_TEXT_MUTED, font=(FF, 9))
-        self.read_wc_pct_label.pack(side="left")
+        self.read_wc_pct_label.pack(side="left", padx=(4, 0))
 
-        # комментарий
-        row_cmt = tk.Frame(form_inner, bg=COLOR_CARD)
-        row_cmt.pack(fill="x", pady=2)
-        ttk.Label(row_cmt, text="Комментарий:", width=16, anchor="w",
-                  background=COLOR_CARD).pack(side="left")
+        # комментарий + кнопка
         self.read_comment_var = tk.StringVar()
-        ttk.Entry(row_cmt, textvariable=self.read_comment_var, width=50).pack(
-            side="left", fill="x", expand=True)
-
-        # кнопки формы
-        row_btns = tk.Frame(form_inner, bg=COLOR_CARD)
-        row_btns.pack(fill="x", pady=(6, 2))
-        tk.Button(row_btns, text="Добавить", font=(FF, 10, "bold"),
-                  bg=COLOR_ACCENT, fg="#151515", activebackground=COLOR_ACCENT,
-                  relief="flat", padx=16, pady=4, cursor="hand2",
-                  command=self.add_reading_entry).pack(side="left")
+        ttk.Entry(row, textvariable=self.read_comment_var, width=14).pack(side="right")
+        tk.Label(row, text="Коммент:", font=(FF, 8), bg=COLOR_CARD,
+                 fg=COLOR_TEXT_MUTED).pack(side="right", padx=(8, 2))
+        tk.Button(row, text="Добавить", font=(FF, 9, "bold"), relief="flat",
+                  bg=COLOR_ACCENT, fg="#151515", activebackground=COLOR_ACCENT_HOVER,
+                  activeforeground="#151515", borderwidth=0, padx=12, pady=3,
+                  command=self.add_reading_entry, cursor="hand2").pack(side="right")
 
         # кнопки таблицы — отдельный ряд, всегда видны
         table_btns = tk.Frame(parent, bg=COLOR_BG)
@@ -175,7 +157,7 @@ class ReadingsTab:
 
         cols = ("date", "po4", "no3", "ph", "wc", "flags", "comment")
         self.readings_tree = ttk.Treeview(table_card, columns=cols,
-                                           show="headings", height=12)
+                                           show="headings", height=7)
         self.readings_tree.heading("date", text="Дата")
         self.readings_tree.heading("po4", text="PO4")
         self.readings_tree.heading("no3", text="NO3")
