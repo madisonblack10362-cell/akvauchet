@@ -10,7 +10,7 @@ from aquarium_app.config import (
     COLOR_TEXT_MUTED, COLOR_TEXT_SOFT, COLOR_ACCENT_HOVER, COLOR_ALT_ROW,
     FONT_FAMILY, TEST_PARAMS, TEST_PARAM_RU,
 )
-from aquarium_app.db import get_aquariums, update_aquarium, get_targets, update_target
+from aquarium_app.db import get_aquariums, get_aquarium, update_aquarium, get_targets, update_target
 from aquarium_app.gui.widgets import LabeledEntry
 
 
