@@ -125,6 +125,8 @@ class AquariumsTab:
         dlg.transient(dlg.master)
         dlg.grab_set()
         dlg.resizable(False, False)
+        dlg.lift()
+        dlg.focus_force()
 
         pad = dict(padx=12, pady=3)
 
