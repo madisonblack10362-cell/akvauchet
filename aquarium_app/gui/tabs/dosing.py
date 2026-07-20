@@ -140,7 +140,7 @@ class DosingTab:
                   activeforeground="#151515", borderwidth=0, padx=12, pady=3,
                   command=self.add_dosing_entries, cursor="hand2").pack(side="right")
 
-        # сетка удобрений: каждое — строка с названием + поле дозы
+        # сетка удобрений: одна строка, все удобрения рядом
         self._dose_fert_grid = tk.Frame(add_frame, bg=COLOR_CARD)
         self._dose_fert_grid.pack(fill="x", padx=8, pady=(0, 2))
         self._dose_fert_entries: dict[int, tuple] = {}  # fert_id -> (fert_row, SpinEntry)
@@ -333,8 +333,13 @@ class DosingTab:
         if combo.get():
             self.refresh_dosing_table()
 
+    def _dose_grid_wheel(self, event):
+        canvas = getattr(self, "_dose_fert_canvas", None)
+        if canvas and canvas.winfo_exists():
+            canvas.xview_scroll(int(-1 * (event.delta / 120)), "units")
+
     def _rebuild_dose_fert_grid(self):
-        """Строит сетку 2 колонки: каждое удобрение = название + поле дозы."""
+        """Одна строка: все удобрения рядом, по центру. Микро → 'Микро'."""
         grid = getattr(self, "_dose_fert_grid", None)
         if grid is None or not grid.winfo_exists():
             return
@@ -343,18 +348,35 @@ class DosingTab:
         self._dose_fert_entries = {}
 
         ferts = get_fertilizers(self.conn)
+        if not ferts:
+            return
         FF = self.FF
-        COLS = 2
-        for i, fert in enumerate(ferts):
-            col = i % COLS
-            if col == 0:
-                row = tk.Frame(grid, bg=COLOR_CARD)
-                row.pack(fill="x", pady=1)
-            cell = tk.Frame(row, bg=COLOR_CARD)
-            cell.pack(side="left", fill="x", expand=True)
-            # цвет по типу
+
+        # Canvas для скрытого горизонтального скролла колёсиком
+        canvas = tk.Canvas(grid, bg=COLOR_CARD, highlightthickness=0, height=28)
+        canvas.pack(fill="x")
+        self._dose_fert_canvas = canvas
+
+        inner = tk.Frame(canvas, bg=COLOR_CARD)
+        self._dose_fert_inner = inner
+        canvas.create_window((0, 0), window=inner, anchor="nw", tags="inner_win")
+
+        def _on_configure(e):
+            canvas.configure(scrollregion=canvas.bbox("all"))
+            iw = inner.winfo_reqwidth()
+            # центрируем если влезает, иначе прижимаем влево
+            x = max(0, (e.width - iw) // 2) if iw <= e.width else 0
+            canvas.coords("inner_win", x, 0)
+            canvas.itemconfig("inner_win", width=iw)
+
+        canvas.bind("<Configure>", _on_configure)
+
+        for fert in ferts:
+            cell = tk.Frame(inner, bg=COLOR_CARD)
+            cell.pack(side="left", padx=6)
             name = (fert["name"] or "").lower()
-            if "микро" in name or "micro" in name:
+            is_micro = "микро" in name or "micro" in name
+            if is_micro:
                 clr = "#8B7D5E"
             elif any(fert.get(ek) for ek in ("no3", "po4", "k", "mg", "ca")):
                 clr = COLOR_ACCENT
@@ -364,14 +386,19 @@ class DosingTab:
                         break
             else:
                 clr = "#8B7D5E"
-            tk.Label(cell, text=fert["name"] or "Без названия", font=(FF, 9),
-                     bg=COLOR_CARD, fg=clr, anchor="w").pack(side="left")
-            spin = SpinEntry(cell, width=6, step=0.1, font_family=FF)
-            spin.pack(side="left", padx=(4, 1))
+            display_name = "Микро" if is_micro else (fert["name"] or "Без названия")
+            tk.Label(cell, text=display_name, font=(FF, 9),
+                     bg=COLOR_CARD, fg=clr).pack(side="left")
+            spin = SpinEntry(cell, width=5, step=0.1, font_family=FF)
+            spin.pack(side="left", padx=(3, 1))
             tk.Label(cell, text="мл", font=(FF, 8),
                      bg=COLOR_CARD, fg=COLOR_TEXT_MUTED).pack(side="left")
             self._dose_fert_entries[fert["id"]] = (fert, spin)
             spin.var.trace_add("write", lambda *_: self._update_dose_preview())
+
+        # колёсико → горизонтальный скролл (без видимого скроллбара)
+        canvas.bind("<Enter>", lambda e: canvas.bind_all("<MouseWheel>", self._dose_grid_wheel))
+        canvas.bind("<Leave>", lambda e: canvas.unbind_all("<MouseWheel>"))
 
     # ------------------------------------------------------------------
     # Обновление таблицы дозировок
