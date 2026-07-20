@@ -82,12 +82,45 @@ class DosingTab:
                   borderwidth=0, padx=10, pady=3, cursor="hand2",
                   command=self.export_dosing_json).pack(side="right", padx=(0, 6))
 
+        # ---- скроллируемый контейнер (всё кроме верхней панели) ----
+        scroll_outer = tk.Frame(tab, bg=COLOR_BG)
+        scroll_outer.pack(fill="both", expand=True)
+
+        self._dose_scroll_canvas = tk.Canvas(scroll_outer, bg=COLOR_BG,
+                                               highlightthickness=0)
+        _dsv = ttk.Scrollbar(scroll_outer, orient="vertical",
+                              command=self._dose_scroll_canvas.yview)
+        self._dose_scroll_canvas.configure(yscrollcommand=_dsv.set)
+        _dsv.pack(side="right", fill="y")
+        self._dose_scroll_canvas.pack(side="left", fill="both", expand=True)
+
+        self._dose_scroll_inner = tk.Frame(self._dose_scroll_canvas, bg=COLOR_BG)
+        self._dose_scroll_win = self._dose_scroll_canvas.create_window(
+            (0, 0), window=self._dose_scroll_inner, anchor="nw")
+        self._dose_scroll_inner.bind(
+            "<Configure>",
+            lambda e: self._dose_scroll_canvas.configure(
+                scrollregion=self._dose_scroll_canvas.bbox("all")))
+        self._dose_scroll_canvas.bind(
+            "<Configure>",
+            lambda e: self._dose_scroll_canvas.itemconfig(
+                self._dose_scroll_win, width=e.width))
+        self._dose_scroll_canvas.bind(
+            "<Enter>",
+            lambda e: self._dose_scroll_canvas.bind_all(
+                "<MouseWheel>", self._dose_tab_wheel))
+        self._dose_scroll_canvas.bind(
+            "<Leave>",
+            lambda e: self._dose_scroll_canvas.unbind_all("<MouseWheel>"))
+
+        inner = self._dose_scroll_inner
+
         # ---- сводная полоса: карточки элементов ----
-        self._dose_summary_frame = tk.Frame(tab, bg=COLOR_BG)
+        self._dose_summary_frame = tk.Frame(inner, bg=COLOR_BG)
         self._dose_summary_frame.pack(fill="x", padx=12, pady=(4, 4))
 
         # ---- график тренда ----
-        chart_outer = tk.Frame(tab, bg=COLOR_CARD,
+        chart_outer = tk.Frame(inner, bg=COLOR_CARD,
                                highlightbackground=COLOR_BORDER, highlightthickness=1)
         chart_outer.pack(fill="x", padx=12, pady=(0, 4))
 
@@ -124,7 +157,7 @@ class DosingTab:
         self.dosing_trend_canvas.pack(fill="x", padx=8, pady=(0, 6))
 
         # ---- форма добавления с живым превью ----
-        add_frame = tk.LabelFrame(tab, text="  Добавить дозировку  ", font=(FF, 10, "bold"),
+        add_frame = tk.LabelFrame(inner, text="  Добавить дозировку  ", font=(FF, 10, "bold"),
                                   bg=COLOR_CARD, fg=COLOR_ACCENT, bd=1, relief="solid")
         add_frame.pack(fill="x", padx=12, pady=4)
 
@@ -159,7 +192,7 @@ class DosingTab:
             side="left", padx=(2, 0), fill="x", expand=True)
 
         # кнопки над таблицей
-        btn_row = tk.Frame(tab, bg=COLOR_BG)
+        btn_row = tk.Frame(inner, bg=COLOR_BG)
         btn_row.pack(fill="x", padx=16, pady=(4, 0))
         tk.Button(btn_row, text="Редактировать", font=(FF, 9), relief="flat",
                   bg=COLOR_CARD, fg=COLOR_TEXT, activebackground=COLOR_ALT_ROW,
@@ -171,8 +204,8 @@ class DosingTab:
                   cursor="hand2").pack(side="left", padx=(8, 0))
 
         # ---- таблица дозировок ----
-        table_frame = tk.Frame(tab, bg=COLOR_BG)
-        table_frame.pack(fill="both", expand=True, padx=12, pady=(4, 12))
+        table_frame = tk.Frame(inner, bg=COLOR_BG)
+        table_frame.pack(fill="x", padx=12, pady=(4, 12))
 
         dose_cols = ("date", "fert", "dose", "comment",
                      "no3", "po4", "k", "fe", "mg", "ca")
@@ -333,6 +366,11 @@ class DosingTab:
         if combo.get():
             self.refresh_dosing_table()
 
+    def _dose_tab_wheel(self, event):
+        c = getattr(self, "_dose_scroll_canvas", None)
+        if c and c.winfo_exists():
+            c.yview_scroll(int(-1 * (event.delta / 120)), "units")
+
     def _dose_grid_wheel(self, event):
         canvas = getattr(self, "_dose_fert_canvas", None)
         if canvas and canvas.winfo_exists():
@@ -396,9 +434,12 @@ class DosingTab:
             self._dose_fert_entries[fert["id"]] = (fert, spin)
             spin.var.trace_add("write", lambda *_: self._update_dose_preview())
 
-        # колёсико → горизонтальный скролл (без видимого скроллбара)
-        canvas.bind("<Enter>", lambda e: canvas.bind_all("<MouseWheel>", self._dose_grid_wheel))
-        canvas.bind("<Leave>", lambda e: canvas.unbind_all("<MouseWheel>"))
+        # колёсико → горизонтальный скролл сетки (переопределяет вертикальный вкладки)
+        canvas.bind("<Enter>", lambda e: (
+            canvas.bind_all("<MouseWheel>", self._dose_grid_wheel)))
+        canvas.bind("<Leave>", lambda e: (
+            canvas.unbind_all("<MouseWheel>"),
+            canvas.bind_all("<MouseWheel>", self._dose_tab_wheel)))
 
     # ------------------------------------------------------------------
     # Обновление таблицы дозировок
