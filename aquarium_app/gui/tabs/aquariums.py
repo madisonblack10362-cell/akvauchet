@@ -96,14 +96,19 @@ class AquariumsTab:
 
     def edit_aquarium(self):
         """Открывает диалог редактирования выбранного аквариума."""
-        sel = self.aq_tree.selection()
-        if not sel:
-            return
-        aq_id = int(sel[0])
-        aq = get_aquarium(self.conn, aq_id)
-        if not aq:
-            return
-        self._aquarium_form_dialog("Редактировать аквариум", aq)
+        try:
+            sel = self.aq_tree.selection()
+            if not sel:
+                return
+            aq_id = int(sel[0])
+            aq = get_aquarium(self.conn, aq_id)
+            if not aq:
+                return
+            self._aquarium_form_dialog("Редактировать аквариум", aq)
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            messagebox.showerror("Ошибка", str(e))
 
     def add_aquarium_dialog(self):
         """Открывает диалог создания нового аквариума."""
