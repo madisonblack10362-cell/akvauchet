@@ -106,7 +106,7 @@ SPIN_SETTINGS: dict[str, dict[str, object]] = {
     "po4": {"step": 0.1, "default": ""},
     "no3": {"step": 1.0, "default": ""},
     "k":   {"step": 0.1, "default": ""},
-    "ph":  {"step": 0.5, "default": "5.0"},
+    "ph":  {"step": 0.5, "default": "7.0"},
 }
 
 # ---------------------------------------------------------------------------

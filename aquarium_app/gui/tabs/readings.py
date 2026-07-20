@@ -108,12 +108,12 @@ class ReadingsTab:
             cell = tk.Frame(row, bg=COLOR_CARD)
             cell.pack(side="left", padx=(0, 4))
             cfg = SPIN_SETTINGS.get(key, {"step": 0.1, "default": ""})
-            se = SpinEntry(cell, width=5, step=cfg["step"],
-                           default=cfg.get("default", ""))
-            se.pack(side="left")
             lbl_text = formula
             tk.Label(cell, text=lbl_text, bg=COLOR_CARD, fg=COLOR_TEXT_MUTED,
-                     font=(FF, 9)).pack(side="left", padx=(2, 0))
+                     font=(FF, 9)).pack(side="left")
+            se = SpinEntry(cell, width=5, step=cfg["step"],
+                           default=cfg.get("default", ""))
+            se.pack(side="left", padx=(2, 0))
             self.read_spin_vars[key] = se.var
             self.read_spin_entries[key] = se
 
