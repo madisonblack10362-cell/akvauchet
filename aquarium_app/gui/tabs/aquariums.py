@@ -137,7 +137,7 @@ class AquariumsTab:
 
         # --- основные поля ---
         tk.Label(dlg, text="Основные параметры", font=(FF, 11, "bold"),
-                 bg=COLOR_BG, fg=COLOR_ACCENT).pack(anchor="w", **pad, pady=(12, 4))
+                 bg=COLOR_BG, fg=COLOR_ACCENT).pack(anchor="w", padx=12, pady=(12, 4))
 
         name_entry = LabeledEntry(dlg, "Название:", width=30,
                                    default=aq["name"] if aq else "Новый аквариум")
@@ -162,7 +162,7 @@ class AquariumsTab:
         # --- целевые диапазоны ---
         ttk.Separator(dlg).pack(fill="x", padx=12, pady=8)
         tk.Label(dlg, text="Целевые диапазоны параметров", font=(FF, 11, "bold"),
-                 bg=COLOR_BG, fg=COLOR_ACCENT).pack(anchor="w", **pad, pady=(0, 4))
+                 bg=COLOR_BG, fg=COLOR_ACCENT).pack(anchor="w", padx=12, pady=(0, 4))
 
         # получаем текущие цели
         targets = {}
