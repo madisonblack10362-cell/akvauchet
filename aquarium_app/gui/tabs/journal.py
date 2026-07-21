@@ -359,14 +359,14 @@ class JournalTab:
         content = tk.Frame(inner, bg=COLOR_CARD)
         content.pack(fill="x")
 
-        # левый столбец — показания
+        # левый столбец — показания (всегда отображается)
+        left_col = tk.Frame(content, bg=COLOR_BG)
+        left_col.pack(side="left", fill="both", expand=True, padx=(0, 4))
+
+        tk.Label(left_col, text="Показания", bg=COLOR_BG, fg=COLOR_TEXT_MUTED,
+                 font=(FF, 8, "bold")).pack(anchor="w", padx=6, pady=(4, 2))
+
         if has_readings:
-            left_col = tk.Frame(content, bg=COLOR_BG)
-            left_col.pack(side="left", fill="both", expand=True, padx=(0, 4))
-
-            tk.Label(left_col, text="Показания", bg=COLOR_BG, fg=COLOR_TEXT_MUTED,
-                     font=(FF, 8, "bold")).pack(anchor="w", padx=6, pady=(4, 2))
-
             # флаги предупреждений
             values_for_flags = {k: readings.get(k) for k in MEASURED_PARAM_KEYS}
             flags = out_of_range_flags(self.conn, aq_id, values_for_flags)
@@ -399,15 +399,18 @@ class JournalTab:
                              fg=COLOR_WARN_TEXT, font=(FF, 8),
                              wraplength=400, anchor="w", justify="left").pack(
                         anchor="w", padx=6, pady=(2, 0))
+        else:
+            tk.Label(left_col, text="— показаний не было —", bg=COLOR_BG,
+                     fg=COLOR_TEXT_MUTED, font=(FF, 9)).pack(anchor="w", padx=6, pady=2)
 
-        # правый столбец — удобрения
+        # правый столбец — удобрения (всегда отображается)
+        right_col = tk.Frame(content, bg=COLOR_BG)
+        right_col.pack(side="left", fill="both", expand=True, padx=(4, 0))
+
+        tk.Label(right_col, text="Удобрения", bg=COLOR_BG, fg=COLOR_TEXT_MUTED,
+                 font=(FF, 8, "bold")).pack(anchor="w", padx=6, pady=(4, 2))
+
         if dosing_list:
-            right_col = tk.Frame(content, bg=COLOR_BG)
-            right_col.pack(side="left", fill="both", expand=True, padx=(4, 0) if has_readings else (0, 0))
-
-            tk.Label(right_col, text="Удобрения", bg=COLOR_BG, fg=COLOR_TEXT_MUTED,
-                     font=(FF, 8, "bold")).pack(anchor="w", padx=6, pady=(4, 2))
-
             for d_row in dosing_list:
                 fert_name = d_row.get("fert_name", "?")
                 dose = d_row.get("dose", 0) or 0
@@ -422,6 +425,9 @@ class JournalTab:
                 if comment:
                     tk.Label(row, text=f"  {comment}", bg=COLOR_BG,
                              fg=COLOR_TEXT_MUTED, font=(FF, 8, "italic")).pack(side="left")
+        else:
+            tk.Label(right_col, text="— не было —", bg=COLOR_BG,
+                     fg=COLOR_TEXT_MUTED, font=(FF, 9)).pack(anchor="w", padx=6, pady=2)
 
         # --- подмена воды ---
         if wc_l is not None or wc_pct is not None:
