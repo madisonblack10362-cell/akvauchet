@@ -426,7 +426,7 @@ class JournalTab:
                     tk.Label(row, text=f"  {comment}", bg=COLOR_BG,
                              fg=COLOR_TEXT_MUTED, font=(FF, 8, "italic")).pack(side="left")
         else:
-            tk.Label(right_col, text="— не было —", bg=COLOR_BG,
+            tk.Label(right_col, text="Удобрения не вносились", bg=COLOR_BG,
                      fg=COLOR_TEXT_MUTED, font=(FF, 9)).pack(anchor="w", padx=6, pady=2)
 
         # --- подмена воды ---
