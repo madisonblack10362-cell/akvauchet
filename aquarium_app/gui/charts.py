@@ -462,7 +462,7 @@ def draw_daily_bars_chart(
 
     # ---- размеры ----
     chart_h = 230
-    legend_h = 18
+    legend_h = 0
     dates_h = 16
     pad_l, pad_r, pad_t, pad_b = 46, 14, 10, 6
     h = pad_t + chart_h + dates_h + legend_h + pad_b
@@ -546,20 +546,6 @@ def draw_daily_bars_chart(
         canvas.create_text(dx, dates_y, anchor="n",
                            text=d.strftime("%d.%m"),
                            fill=COLOR_TEXT_MUTED, font=(font_family, 7))
-
-    # ---- легенда ----
-    legend_y = dates_y + dates_h + 2
-    lx = pad_l
-    for key, color, label, hist in elem_data:
-        vals = [v for _, v in hist if isinstance(v, (int, float))]
-        total = sum(vals)
-        txt = f"{label}  {fmt_axis(total, key=key)}"
-        canvas.create_rectangle(lx, legend_y - 4, lx + 10, legend_y + 4,
-                                fill=color, outline="")
-        canvas.create_text(lx + 14, legend_y, anchor="w",
-                           text=txt, fill=COLOR_TEXT_SOFT,
-                           font=(font_family, 8))
-        lx += 18 + len(txt) * 5 + 12
 
     # ---- hover ----
     canvas._hover_points = hover_points
