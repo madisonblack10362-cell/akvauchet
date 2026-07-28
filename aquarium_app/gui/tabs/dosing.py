@@ -274,10 +274,6 @@ class DosingTab:
                     total_deltas[ek] = total_deltas.get(ek, 0) + deltas.get(ek, 0)
 
         if not has_any:
-            tk.Label(self._dose_preview_frame,
-                     text="Введите дозы для просмотра суммарного прироста",
-                     bg=COLOR_BG, fg=COLOR_TEXT_MUTED,
-                     font=(self.FF, 8, "italic")).pack(anchor="w", padx=4, pady=2)
             return
 
         preview_inner = tk.Frame(self._dose_preview_frame, bg=COLOR_BG)
@@ -287,21 +283,21 @@ class DosingTab:
                  fg=COLOR_TEXT_MUTED, font=(self.FF, 8, "bold")).pack(side="left", padx=(0, 6))
 
         macro = {"no3", "po4", "k"}
+        shown = False
         for ek, val in sorted(total_deltas.items(), key=lambda x: ELEMENT_KEYS.index(x[0]) if x[0] in ELEMENT_KEYS else 99):
             if val <= 0:
                 continue
+            if ek not in macro:
+                continue
+            shown = True
             color = ELEMENT_COLORS.get(ek, COLOR_ACCENT)
             formula = ELEMENT_FORMULA.get(ek, ek)
-            if ek in macro:
-                txt = f"{formula} +{val:.1f}"
-            elif val < 0.01:
-                txt = f"{formula} +{val:.4f}"
-            elif val < 1:
-                txt = f"{formula} +{val:.3f}"
-            else:
-                txt = f"{formula} +{val:.2f}"
+            txt = f"{formula} +{val:.1f}"
             tk.Label(preview_inner, text=txt, bg=COLOR_BG, fg=color,
                      font=(self.FF, 8, "bold")).pack(side="left", padx=(0, 10))
+        if not shown:
+            tk.Label(preview_inner, text="—", bg=COLOR_BG, fg=COLOR_TEXT_MUTED,
+                     font=(self.FF, 8)).pack(side="left")
 
     # ------------------------------------------------------------------
     # Сводная полоса элементов
