@@ -679,7 +679,7 @@ class TimersTab:
         count = len(due)
         self._update_timer_badge(count)
 
-        # показываем одно уведомление
+        # показываем одно уведомление и помечаем как выполненный
         t = due[0]
         aq_name = t.get("aquarium_name") or "Аквариум"
         msg = (
@@ -689,6 +689,14 @@ class TimersTab:
         )
         try:
             messagebox.showwarning("⏰ Напоминание", msg)
+        except Exception:
+            pass
+
+        # помечаем таймер как показанный, чтобы не спамить
+        try:
+            from aquarium_app.db import mark_timer_fired
+            mark_timer_fired(self.conn, t["id"])
+            self.refresh_timers()
         except Exception:
             pass
 
