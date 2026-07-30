@@ -323,10 +323,10 @@ class ProcessesTab:
         FF = self.FF
         is_edit = entry is not None
 
-        dlg = tk.Toplevel(self.root)
+        dlg = tk.Toplevel(self)
         dlg.title(title)
         dlg.configure(bg=COLOR_BG)
-        dlg.transient(self.root)
+        dlg.transient(self)
         dlg.grab_set()
         dlg.resizable(False, False)
 
